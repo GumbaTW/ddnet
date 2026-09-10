@@ -2874,10 +2874,7 @@ void CGameClient::OnPredict()
 
 		for(int i = 0; i < MAX_CLIENTS; i++)
 			if(CCharacter *pChar = m_PredictedWorld.GetCharacterById(i))
-			{
-				m_aClients[i].m_aPredPos[Tick % 200] = pChar->Core()->m_Pos;
-				m_aClients[i].m_aPredTick[Tick % 200] = Tick;
-			}
+				m_aClients[i].AddPredictedTick(Tick, *pChar->Core());
 
 		// check if we want to trigger effects
 		if(Tick > m_aLastNewPredictedTick[Dummy] && Tick <= FinalTickRegular)
@@ -3235,6 +3232,9 @@ void CGameClient::CClientData::Reset()
 	std::fill(std::begin(m_aSmoothLen), std::end(m_aSmoothLen), 0);
 	std::fill(std::begin(m_aPredPos), std::end(m_aPredPos), vec2(0.0f, 0.0f));
 	std::fill(std::begin(m_aPredTick), std::end(m_aPredTick), 0);
+	std::fill(std::begin(m_aPredHookPos), std::end(m_aPredHookPos), vec2(0.0f, 0.0f));
+	std::fill(std::begin(m_aPredHookState), std::end(m_aPredHookState), 0);
+	std::fill(std::begin(m_aPredHookedPlayer), std::end(m_aPredHookedPlayer), -1);
 	m_SpecCharPresent = false;
 	m_SpecChar = vec2(0.0f, 0.0f);
 
@@ -3744,10 +3744,7 @@ void CGameClient::UpdatePrediction()
 
 			for(int i = 0; i < MAX_CLIENTS; i++)
 				if(CCharacter *pChar = m_GameWorld.GetCharacterById(i))
-				{
-					m_aClients[i].m_aPredPos[Tick % 200] = pChar->Core()->m_Pos;
-					m_aClients[i].m_aPredTick[Tick % 200] = Tick;
-				}
+					m_aClients[i].AddPredictedTick(Tick, *pChar->Core());
 		}
 	}
 	else
@@ -3764,10 +3761,7 @@ void CGameClient::UpdatePrediction()
 
 	for(int i = 0; i < MAX_CLIENTS; i++)
 		if(CCharacter *pChar = m_GameWorld.GetCharacterById(i))
-		{
-			m_aClients[i].m_aPredPos[Client()->GameTick(g_Config.m_ClDummy) % 200] = pChar->Core()->m_Pos;
-			m_aClients[i].m_aPredTick[Client()->GameTick(g_Config.m_ClDummy) % 200] = Client()->GameTick(g_Config.m_ClDummy);
-		}
+			m_aClients[i].AddPredictedTick(Client()->GameTick(g_Config.m_ClDummy), *pChar->Core());
 
 	// update the local gameworld with the new snapshot
 	m_GameWorld.NetObjBegin(m_Teams, m_Snap.m_LocalClientId);
@@ -3964,7 +3958,10 @@ void CGameClient::UpdateRenderedCharacters()
 				m_aClients[i].m_IsPredicted ? Client()->PredIntraGameTick(g_Config.m_ClDummy) : Client()->IntraGameTick(g_Config.m_ClDummy));
 
 			if(FastInputEnabled() && (i == m_Snap.m_LocalClientId || (PredictDummy() && i == m_aLocalIds[!g_Config.m_ClDummy])))
+			{
 				Pos = GetFastInputPos(i);
+				ApplyFastInputHook(i);
+			}
 
 			if(i == m_Snap.m_LocalClientId || IsDummy)
 			{
@@ -3986,7 +3983,10 @@ void CGameClient::UpdateRenderedCharacters()
 					Pos = GetSmoothPos(i);
 
 				if(FastInputEnabled() && g_Config.m_GcFastInputOthers)
+				{
 					Pos = GetFastInputPos(i);
+					ApplyFastInputHook(i);
+				}
 			}
 		}
 		m_aClients[i].m_RenderPos = Pos;
@@ -4157,12 +4157,10 @@ vec2 CGameClient::GetSmoothPos(int ClientId)
 	return Pos;
 }
 
-vec2 CGameClient::GetFastInputPos(int ClientId)
+bool CGameClient::GetFastInputSampleTick(int ClientId, int &Tick, float &Intra) const
 {
-	float PredIntraTick = Client()->PredIntraGameTick(g_Config.m_ClDummy);
-	int PredTick = Client()->PredGameTick(g_Config.m_ClDummy);
-
-	vec2 Pos = mix(m_aClients[ClientId].m_PrevPredicted.m_Pos, m_aClients[ClientId].m_Predicted.m_Pos, PredIntraTick);
+	Intra = Client()->PredIntraGameTick(g_Config.m_ClDummy);
+	Tick = Client()->PredGameTick(g_Config.m_ClDummy);
 
 	const float OffsetTicks = FastInputOffsetTicks();
 	const int FastInputTicks = FastInputExtraTicks(false);
@@ -4171,28 +4169,57 @@ vec2 CGameClient::GetFastInputPos(int ClientId)
 
 	if(FastInputAggressive())
 	{
-		ApplyFastInputOffset(OffsetTicks, PredTick, PredIntraTick);
+		ApplyFastInputOffset(OffsetTicks, Tick, Intra);
 	}
 	else
 	{
 		float FastInputIntra = (g_Config.m_GcFastInputAmount % 20) / 20.0f;
 		int ClassicTicks = g_Config.m_GcFastInputAmount / 20;
-		float CombinedIntra = PredIntraTick + FastInputIntra;
+		float CombinedIntra = Intra + FastInputIntra;
 		float IntraRemainder = 0.0f;
 		float FinalIntra = std::modf(CombinedIntra, &IntraRemainder);
 		ClassicTicks += static_cast<int>(IntraRemainder);
-		PredTick += ClassicTicks;
-		PredIntraTick = FinalIntra;
+		Tick += ClassicTicks;
+		Intra = FinalIntra;
 	}
 
-	if(PredTick > 0 &&
-		m_aClients[ClientId].m_aPredTick[(PredTick - 1) % 200] >= Client()->PrevGameTick(g_Config.m_ClDummy) &&
-		m_aClients[ClientId].m_aPredTick[PredTick % 200] <= Client()->PredGameTick(g_Config.m_ClDummy) + FastTicksForClient)
-	{
-		Pos = mix(m_aClients[ClientId].m_aPredPos[(PredTick - 1) % 200], m_aClients[ClientId].m_aPredPos[PredTick % 200], PredIntraTick);
-	}
+	return Tick > 0 &&
+		m_aClients[ClientId].m_aPredTick[(Tick - 1) % 200] >= Client()->PrevGameTick(g_Config.m_ClDummy) &&
+		m_aClients[ClientId].m_aPredTick[Tick % 200] <= Client()->PredGameTick(g_Config.m_ClDummy) + FastTicksForClient;
+}
+
+vec2 CGameClient::GetFastInputPos(int ClientId)
+{
+	float PredIntraTick = Client()->PredIntraGameTick(g_Config.m_ClDummy);
+	vec2 Pos = mix(m_aClients[ClientId].m_PrevPredicted.m_Pos, m_aClients[ClientId].m_Predicted.m_Pos, PredIntraTick);
+
+	int Tick;
+	float Intra;
+	if(GetFastInputSampleTick(ClientId, Tick, Intra))
+		Pos = mix(m_aClients[ClientId].m_aPredPos[(Tick - 1) % 200], m_aClients[ClientId].m_aPredPos[Tick % 200], Intra);
 
 	return Pos;
+}
+
+void CGameClient::ApplyFastInputHook(int ClientId)
+{
+	int Tick;
+	float Intra;
+	if(!GetFastInputSampleTick(ClientId, Tick, Intra))
+		return;
+
+	vec2 PrevHookPos = m_aClients[ClientId].m_aPredHookPos[(Tick - 1) % 200];
+	if(m_aClients[ClientId].m_aPredHookState[(Tick - 1) % 200] <= 0)
+		PrevHookPos = m_aClients[ClientId].m_aPredPos[(Tick - 1) % 200];
+
+	const vec2 HookPos = mix(PrevHookPos, m_aClients[ClientId].m_aPredHookPos[Tick % 200], Intra);
+	// Same interpolated tip in prev/cur so RenderHook's PredIntra mix stays on the fast-input tick.
+	m_aClients[ClientId].m_RenderPrev.m_HookX = m_aClients[ClientId].m_RenderCur.m_HookX = round_to_int(HookPos.x);
+	m_aClients[ClientId].m_RenderPrev.m_HookY = m_aClients[ClientId].m_RenderCur.m_HookY = round_to_int(HookPos.y);
+	m_aClients[ClientId].m_RenderPrev.m_HookState = m_aClients[ClientId].m_aPredHookState[(Tick - 1) % 200];
+	m_aClients[ClientId].m_RenderCur.m_HookState = m_aClients[ClientId].m_aPredHookState[Tick % 200];
+	m_aClients[ClientId].m_RenderPrev.m_HookedPlayer = m_aClients[ClientId].m_aPredHookedPlayer[(Tick - 1) % 200];
+	m_aClients[ClientId].m_RenderCur.m_HookedPlayer = m_aClients[ClientId].m_aPredHookedPlayer[Tick % 200];
 }
 
 bool CGameClient::CheckNewInput()
