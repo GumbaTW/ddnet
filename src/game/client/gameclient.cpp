@@ -211,6 +211,7 @@ void CGameClient::OnConsoleInit()
 		pComponent->OnConsoleInit();
 
 	Console()->Chain("cl_languagefile", ConchainLanguageUpdate, this);
+	Console()->Chain("cl_custom_font", ConchainCustomFont, this);
 
 	Console()->Chain("player_name", ConchainSpecialInfoupdate, this);
 	Console()->Chain("player_clan", ConchainSpecialInfoupdate, this);
@@ -369,6 +370,7 @@ void CGameClient::OnInit()
 	{
 		Client()->AddWarning(SWarning(Localize("Some fonts could not be loaded. Check the local console for details.")));
 	}
+	TextRender()->SetFontFace(g_Config.m_ClCustomFont);
 	TextRender()->SetFontLanguageVariant(g_Config.m_ClLanguagefile);
 
 	// update and swap after font loading, they are quite huge
@@ -1365,6 +1367,15 @@ void CGameClient::OnWindowResize()
 		pComponent->OnWindowResize();
 
 	Ui()->OnWindowResize();
+}
+
+void CGameClient::ApplyCustomFont()
+{
+	TextRender()->SetFontFace(g_Config.m_ClCustomFont);
+	Client()->OnWindowResize();
+	// Force overlay text textures to rebuild for the new font face.
+	m_MapImages.SetTextureScale(101);
+	m_MapImages.SetTextureScale(g_Config.m_ClTextEntitiesSize);
 }
 
 void CGameClient::OnLanguageChange()
@@ -3494,6 +3505,15 @@ void CGameClient::ConchainLanguageUpdate(IConsole::IResult *pResult, void *pUser
 	{
 		pThis->OnLanguageChange();
 	}
+}
+
+void CGameClient::ConchainCustomFont(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData)
+{
+	CGameClient *pThis = static_cast<CGameClient *>(pUserData);
+	const bool Changed = pThis->Client()->GlobalTime() && pResult->NumArguments() && str_comp(pResult->GetString(0), g_Config.m_ClCustomFont) != 0;
+	pfnCallback(pResult, pCallbackUserData);
+	if(Changed)
+		pThis->ApplyCustomFont();
 }
 
 void CGameClient::ConchainSpecialInfoupdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData)

@@ -10,6 +10,8 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
+#include <vector>
 
 enum
 {
@@ -197,6 +199,8 @@ public:
 	virtual bool LoadFonts() = 0;
 	virtual void SetFontPreset(EFontPreset FontPreset) = 0;
 	virtual void SetFontLanguageVariant(const char *pLanguageFile) = 0;
+	virtual const std::vector<std::string> &GetFontFaces() const = 0;
+	virtual void SetFontFace(const char *pFace) = 0;
 
 	virtual void SetRenderFlags(unsigned Flags) = 0;
 	virtual unsigned GetRenderFlags() const = 0;

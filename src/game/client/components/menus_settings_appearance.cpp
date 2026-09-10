@@ -4,8 +4,10 @@
 
 #include <base/str.h>
 
+#include <engine/font_icons.h>
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
+#include <engine/storage.h>
 #include <engine/textrender.h>
 
 #include <generated/client_data.h>
@@ -79,6 +81,48 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 	if(s_CurTab == APPEARANCE_TAB_HUD)
 	{
 		MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
+
+		CUIRect FontDropDownRect, FontDirectory, FontLabel;
+		LeftView.HSplitTop(LineSize, &FontDropDownRect, &LeftView);
+		FontDropDownRect.VSplitLeft(100.0f, &FontLabel, &FontDropDownRect);
+		FontDropDownRect.VSplitRight(LineSize, &FontDropDownRect, &FontDirectory);
+		FontDropDownRect.VSplitRight(MarginSmall, &FontDropDownRect, nullptr);
+		Ui()->DoLabel(&FontLabel, Localize("Font"), 14.0f, TEXTALIGN_ML);
+
+		const std::vector<std::string> &vFontFaces = TextRender()->GetFontFaces();
+		static std::vector<const char *> s_FontDropDownNames;
+		static CUi::SDropDownState s_FontDropDownState;
+		static CScrollRegion s_FontDropDownScrollRegion;
+		s_FontDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_FontDropDownScrollRegion;
+		s_FontDropDownState.m_SelectionPopupContext.m_PreviewFontFaces = true;
+		s_FontDropDownNames.clear();
+		s_FontDropDownNames.reserve(vFontFaces.size());
+		int FontSelectedOld = -1;
+		for(size_t i = 0; i < vFontFaces.size(); ++i)
+		{
+			s_FontDropDownNames.push_back(vFontFaces[i].c_str());
+			if(str_comp_nocase(g_Config.m_ClCustomFont, vFontFaces[i].c_str()) == 0)
+				FontSelectedOld = (int)i;
+		}
+		const int FontSelectedNew = Ui()->DoDropDown(&FontDropDownRect, FontSelectedOld, s_FontDropDownNames.data(), s_FontDropDownNames.size(), s_FontDropDownState);
+		if(FontSelectedOld != FontSelectedNew && FontSelectedNew >= 0 && FontSelectedNew < (int)s_FontDropDownNames.size())
+		{
+			str_copy(g_Config.m_ClCustomFont, s_FontDropDownNames[FontSelectedNew]);
+			GameClient()->ApplyCustomFont();
+		}
+
+		static CButtonContainer s_FontDirectoryId;
+		if(Ui()->DoButton_FontIcon(&s_FontDirectoryId, FontIcon::FOLDER, 0, &FontDirectory, BUTTONFLAG_LEFT))
+		{
+			Storage()->CreateFolder("fonts", IStorage::TYPE_SAVE);
+			Storage()->CreateFolder("fonts/custom", IStorage::TYPE_SAVE);
+			char aFontDir[IO_MAX_PATH_LENGTH];
+			Storage()->GetCompletePath(IStorage::TYPE_SAVE, "fonts/custom", aFontDir, sizeof(aFontDir));
+			Client()->ViewFile(aFontDir);
+		}
+		GameClient()->m_Tooltips.DoToolTip(&s_FontDirectoryId, &FontDirectory, Localize("Open the directory to add custom fonts"));
+
+		LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
 
 		// ***** HUD ***** //
 		Ui()->DoLabel_AutoLineSize(Localize("HUD"), HeadlineFontSize,
