@@ -1641,6 +1641,15 @@ set(EXPECTED_DATA
   fonts/Font_Awesome_6_Free-Solid-900.otf
   fonts/GlowSansJ-Compressed-Book.otf
   fonts/SourceHanSans.ttc
+  fonts/custom/Cabin-Regular.ttf
+  fonts/custom/FreeSansBold.ttf
+  fonts/custom/GoogleSans-Regular.ttf
+  fonts/custom/Inter_24pt-Regular.ttf
+  fonts/custom/Inter_24pt-SemiBold.ttf
+  fonts/custom/Montserrat-Regular.ttf
+  fonts/custom/Nunito-Black.ttf
+  fonts/custom/Rubik-Regular.ttf
+  fonts/custom/minecraft_font.ttf
   fonts/index.json
   game.png
   gui_buttons.png
