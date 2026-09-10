@@ -2961,6 +2961,16 @@ void CClient::Update()
 					// send input
 					SendInput();
 				}
+
+				if(g_Config.m_GcFastInput && g_Config.m_GcFastInputMode == 1 && g_Config.m_GcFastInputTicks > 0)
+				{
+					GameClient()->CheckNewInput();
+					Repredict = true;
+				}
+				else if(g_Config.m_GcFastInput && GameClient()->CheckNewInput())
+				{
+					Repredict = true;
+				}
 			}
 
 			// only do sane predictions

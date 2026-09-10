@@ -2333,6 +2333,7 @@ set_src(ENGINE_SHARED GLOB_RECURSE src/engine/shared
   config.cpp
   config.h
   config_variables.h
+  config_variables_gclient.h
   console.cpp
   console.h
   csv.cpp
@@ -2691,6 +2692,7 @@ if(CLIENT)
     components/menus.h
     components/menus_browser.cpp
     components/menus_demo.cpp
+    components/menus_gclient.cpp
     components/menus_ingame.cpp
     components/menus_ingame_touch_controls.cpp
     components/menus_ingame_touch_controls.h

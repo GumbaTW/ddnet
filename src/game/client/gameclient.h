@@ -496,6 +496,7 @@ public:
 
 		CCharacterCore m_Predicted;
 		CCharacterCore m_PrevPredicted;
+		CCharacterCore m_RegularPredicted;
 
 		std::shared_ptr<CManagedTeeRenderInfo> m_pSkinInfo = nullptr; // this is what the server reports
 		CTeeRenderInfo m_RenderInfo; // this is what we use
@@ -628,6 +629,7 @@ public:
 	void InvalidateSnapshot() override;
 	void OnNewSnapshot(bool DummySwapped) override;
 	void OnPredict() override;
+	bool CheckNewInput() override;
 	void OnActivateEditor() override;
 	void OnDummySwap() override;
 	int OnSnapInput(int *pData, bool Dummy, bool Force) override;
@@ -681,6 +683,13 @@ public:
 	void SendReadyChange7(); // NOLINT(readability-make-member-function-const)
 
 	void ApplyPreInputs(int Tick, bool Direct, CGameWorld &GameWorld);
+	bool GetDummyFastInput(CNetObj_PlayerInput &DummyFastInput, const CNetObj_PlayerInput *pDummyInputData, const class CCharacter *pDummyChar, int LocalTee, int DummyTee) const;
+	// Fast / aggressive predictive input helpers (visual only; does not change server input)
+	bool FastInputEnabled() const;
+	bool FastInputAggressive() const;
+	float FastInputOffsetTicks() const;
+	int FastInputExtraTicks(bool ForOthers = false) const;
+	void ApplyFastInputOffset(float OffsetTicks, int &Tick, float &Intra) const;
 
 	int m_aNextChangeInfo[NUM_DUMMIES];
 
@@ -722,6 +731,8 @@ public:
 	CGameWorld m_GameWorld;
 	CGameWorld m_PredictedWorld;
 	CGameWorld m_PrevPredictedWorld;
+	CGameWorld m_RegularPredictedWorld;
+	CGameWorld m_PrevRegularPredictedWorld;
 
 	std::vector<SSwitchers> &Switchers() { return m_GameWorld.m_Core.m_vSwitchers; }
 	std::vector<SSwitchers> &PredSwitchers() { return m_PredictedWorld.m_Core.m_vSwitchers; }
@@ -961,6 +972,7 @@ private:
 	void DetectStrongHook();
 
 	vec2 GetSmoothPos(int ClientId);
+	vec2 GetFastInputPos(int ClientId);
 
 	int m_IsDummySwapping;
 	CCharOrder m_CharOrder;
