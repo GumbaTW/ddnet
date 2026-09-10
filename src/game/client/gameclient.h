@@ -534,8 +534,20 @@ public:
 		int64_t m_aSmoothLen[2];
 		vec2 m_aPredPos[200];
 		int m_aPredTick[200];
+		vec2 m_aPredHookPos[200];
+		int m_aPredHookState[200];
+		int m_aPredHookedPlayer[200];
 		bool m_SpecCharPresent;
 		vec2 m_SpecChar;
+
+		void AddPredictedTick(int Tick, const CCharacterCore &Core)
+		{
+			m_aPredPos[Tick % 200] = Core.m_Pos;
+			m_aPredTick[Tick % 200] = Tick;
+			m_aPredHookPos[Tick % 200] = Core.m_HookPos;
+			m_aPredHookState[Tick % 200] = Core.m_HookState;
+			m_aPredHookedPlayer[Tick % 200] = Core.HookedPlayer();
+		}
 
 		void UpdateSkinInfo();
 		void UpdateSkin7HatSprite(int Dummy);
@@ -690,6 +702,8 @@ public:
 	float FastInputOffsetTicks() const;
 	int FastInputExtraTicks(bool ForOthers = false) const;
 	void ApplyFastInputOffset(float OffsetTicks, int &Tick, float &Intra) const;
+	bool GetFastInputSampleTick(int ClientId, int &Tick, float &Intra) const;
+	void ApplyFastInputHook(int ClientId);
 
 	int m_aNextChangeInfo[NUM_DUMMIES];
 
