@@ -644,6 +644,14 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 				NewPage = PAGE_GHOST;
 		}
 
+		Box.VSplitLeft(90.0f, &Button, &Box);
+		static CButtonContainer s_SavesButton;
+		if(DoButton_MenuTab(&s_SavesButton, Localize("Saves"), ActivePage == PAGE_SAVES, &Button, IGraphics::CORNER_NONE))
+		{
+			NewPage = PAGE_SAVES;
+			m_SavesNeedReload = true;
+		}
+
 		Box.VSplitLeft(100.0f, &Button, &Box);
 		Box.VSplitLeft(4.0f, nullptr, &Box);
 		static CButtonContainer s_CallVoteButton;
@@ -1121,6 +1129,10 @@ void CMenus::Render()
 			else if(m_GamePage == PAGE_GHOST)
 			{
 				RenderGhost(MainView);
+			}
+			else if(m_GamePage == PAGE_SAVES)
+			{
+				RenderSaves(MainView);
 			}
 			else if(m_GamePage == PAGE_CALLVOTE)
 			{
