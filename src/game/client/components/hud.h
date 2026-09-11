@@ -94,6 +94,18 @@ class CHud : public CComponent
 	};
 	class CMovementInformation GetMovementInformation(int ClientId, int Conn) const;
 
+	class CDummyMovementHud
+	{
+	public:
+		int m_ClientId = -1;
+		bool m_ShowPos = false;
+		bool m_ShowSpeed = false;
+		bool m_ShowAngle = false;
+	};
+	int GetDummyMovementClientId() const;
+	CDummyMovementHud GetDummyMovementHud(bool PosOnly) const;
+	float GetDummyMovementInformationExtraHeight(bool PosOnly) const;
+
 	void RenderGameTimer();
 	void RenderPauseNotification();
 	void RenderSuddenDeath();

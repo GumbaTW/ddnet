@@ -136,6 +136,11 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowhudPlayerSpeed, Localize("Show player speed"), &g_Config.m_ClShowhudPlayerSpeed, &RightView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowhudPlayerAngle, Localize("Show player target angle"), &g_Config.m_ClShowhudPlayerAngle, &RightView, LineSize);
 
+		// Dummy movement information display settings
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowhudDummyPosition, Localize("Show dummy position"), &g_Config.m_ClShowhudDummyPosition, &RightView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowhudDummySpeed, Localize("Show dummy speed"), &g_Config.m_ClShowhudDummySpeed, &RightView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowhudDummyAngle, Localize("Show dummy target angle"), &g_Config.m_ClShowhudDummyAngle, &RightView, LineSize);
+
 		// Freeze bar settings
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowFreezeBars, Localize("Show freeze bars"), &g_Config.m_ClShowFreezeBars, &RightView, LineSize);
 		RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
