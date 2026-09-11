@@ -4,8 +4,10 @@
 
 #include <base/str.h>
 
+#include <engine/font_icons.h>
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
+#include <engine/storage.h>
 #include <engine/textrender.h>
 
 #include <generated/client_data.h>
@@ -78,7 +80,52 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 
 	if(s_CurTab == APPEARANCE_TAB_HUD)
 	{
+		CUIRect FrozenTeeView;
+		MainView.HSplitBottom(HeadlineHeight + MarginSmall + LineSize * 5.0f, &MainView, &FrozenTeeView);
+		MainView.HSplitBottom(MarginBetweenViews, &MainView, nullptr);
 		MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
+
+		CUIRect FontDropDownRect, FontDirectory, FontLabel;
+		LeftView.HSplitTop(LineSize, &FontDropDownRect, &LeftView);
+		FontDropDownRect.VSplitLeft(100.0f, &FontLabel, &FontDropDownRect);
+		FontDropDownRect.VSplitRight(LineSize, &FontDropDownRect, &FontDirectory);
+		FontDropDownRect.VSplitRight(MarginSmall, &FontDropDownRect, nullptr);
+		Ui()->DoLabel(&FontLabel, Localize("Font"), 14.0f, TEXTALIGN_ML);
+
+		const std::vector<std::string> &vFontFaces = TextRender()->GetFontFaces();
+		static std::vector<const char *> s_FontDropDownNames;
+		static CUi::SDropDownState s_FontDropDownState;
+		static CScrollRegion s_FontDropDownScrollRegion;
+		s_FontDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_FontDropDownScrollRegion;
+		s_FontDropDownState.m_SelectionPopupContext.m_PreviewFontFaces = true;
+		s_FontDropDownNames.clear();
+		s_FontDropDownNames.reserve(vFontFaces.size());
+		int FontSelectedOld = -1;
+		for(size_t i = 0; i < vFontFaces.size(); ++i)
+		{
+			s_FontDropDownNames.push_back(vFontFaces[i].c_str());
+			if(str_comp_nocase(g_Config.m_ClCustomFont, vFontFaces[i].c_str()) == 0)
+				FontSelectedOld = (int)i;
+		}
+		const int FontSelectedNew = Ui()->DoDropDown(&FontDropDownRect, FontSelectedOld, s_FontDropDownNames.data(), s_FontDropDownNames.size(), s_FontDropDownState);
+		if(FontSelectedOld != FontSelectedNew && FontSelectedNew >= 0 && FontSelectedNew < (int)s_FontDropDownNames.size())
+		{
+			str_copy(g_Config.m_ClCustomFont, s_FontDropDownNames[FontSelectedNew]);
+			GameClient()->ApplyCustomFont();
+		}
+
+		static CButtonContainer s_FontDirectoryId;
+		if(Ui()->DoButton_FontIcon(&s_FontDirectoryId, FontIcon::FOLDER, 0, &FontDirectory, BUTTONFLAG_LEFT))
+		{
+			Storage()->CreateFolder("fonts", IStorage::TYPE_SAVE);
+			Storage()->CreateFolder("fonts/custom", IStorage::TYPE_SAVE);
+			char aFontDir[IO_MAX_PATH_LENGTH];
+			Storage()->GetCompletePath(IStorage::TYPE_SAVE, "fonts/custom", aFontDir, sizeof(aFontDir));
+			Client()->ViewFile(aFontDir);
+		}
+		GameClient()->m_Tooltips.DoToolTip(&s_FontDirectoryId, &FontDirectory, Localize("Open the directory to add custom fonts"));
+
+		LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
 
 		// ***** HUD ***** //
 		Ui()->DoLabel_AutoLineSize(Localize("HUD"), HeadlineFontSize,
@@ -136,12 +183,42 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowhudPlayerSpeed, Localize("Show player speed"), &g_Config.m_ClShowhudPlayerSpeed, &RightView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowhudPlayerAngle, Localize("Show player target angle"), &g_Config.m_ClShowhudPlayerAngle, &RightView, LineSize);
 
+		// Dummy movement information display settings
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowhudDummyPosition, Localize("Show dummy position"), &g_Config.m_ClShowhudDummyPosition, &RightView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowhudDummySpeed, Localize("Show dummy speed"), &g_Config.m_ClShowhudDummySpeed, &RightView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowhudDummyAngle, Localize("Show dummy target angle"), &g_Config.m_ClShowhudDummyAngle, &RightView, LineSize);
+
 		// Freeze bar settings
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowFreezeBars, Localize("Show freeze bars"), &g_Config.m_ClShowFreezeBars, &RightView, LineSize);
 		RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
 		if(g_Config.m_ClShowFreezeBars)
 		{
 			Ui()->DoScrollbarOption(&g_Config.m_ClFreezeBarsAlphaInsideFreeze, &g_Config.m_ClFreezeBarsAlphaInsideFreeze, &Button, Localize("Opacity of freeze bars inside freeze"), 0, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
+		}
+
+		// ***** Frozen Tee Display ***** //
+		Ui()->DoLabel_AutoLineSize(Localize("Frozen Tee Display"), HeadlineFontSize,
+			TEXTALIGN_ML, &FrozenTeeView, HeadlineHeight);
+		FrozenTeeView.HSplitTop(MarginSmall, nullptr, &FrozenTeeView);
+		FrozenTeeView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
+
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowFrozenHud, Localize("Show frozen tee display"), &g_Config.m_ClShowFrozenHud, &LeftView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowFrozenHudSkins, Localize("Use skins instead of ninja tees"), &g_Config.m_ClShowFrozenHudSkins, &LeftView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFrozenHudTeamOnly, Localize("Only show after joining a team"), &g_Config.m_ClFrozenHudTeamOnly, &LeftView, LineSize);
+		LeftView.HSplitTop(LineSize, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_ClFrozenMaxRows, &g_Config.m_ClFrozenMaxRows, &Button, Localize("Max Rows"), 1, 6);
+		LeftView.HSplitTop(LineSize, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_ClFrozenHudTeeSize, &g_Config.m_ClFrozenHudTeeSize, &Button, Localize("Tee Size"), 8, 27);
+
+		RightView.HSplitTop(LineSize, &Button, &RightView);
+		if(DoButton_CheckBox(&g_Config.m_ClShowFrozenText, Localize("Tees left alive text"), g_Config.m_ClShowFrozenText >= 1, &Button))
+			g_Config.m_ClShowFrozenText = g_Config.m_ClShowFrozenText >= 1 ? 0 : 1;
+		if(g_Config.m_ClShowFrozenText)
+		{
+			RightView.HSplitTop(LineSize, &Button, &RightView);
+			static int s_CountFrozenText = 0;
+			if(DoButton_CheckBox(&s_CountFrozenText, Localize("Count frozen tees"), g_Config.m_ClShowFrozenText == 2, &Button))
+				g_Config.m_ClShowFrozenText = g_Config.m_ClShowFrozenText != 2 ? 2 : 1;
 		}
 	}
 	else if(s_CurTab == APPEARANCE_TAB_CHAT)

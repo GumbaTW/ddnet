@@ -257,6 +257,7 @@ private:
 	static void ConReadyChange7(IConsole::IResult *pResult, void *pUserData);
 
 	static void ConchainLanguageUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	static void ConchainCustomFont(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainSpecialInfoupdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainSpecialDummyInfoupdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainRefreshSkins(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
@@ -496,6 +497,7 @@ public:
 
 		CCharacterCore m_Predicted;
 		CCharacterCore m_PrevPredicted;
+		CCharacterCore m_RegularPredicted;
 
 		std::shared_ptr<CManagedTeeRenderInfo> m_pSkinInfo = nullptr; // this is what the server reports
 		CTeeRenderInfo m_RenderInfo; // this is what we use
@@ -533,8 +535,20 @@ public:
 		int64_t m_aSmoothLen[2];
 		vec2 m_aPredPos[200];
 		int m_aPredTick[200];
+		vec2 m_aPredHookPos[200];
+		int m_aPredHookState[200];
+		int m_aPredHookedPlayer[200];
 		bool m_SpecCharPresent;
 		vec2 m_SpecChar;
+
+		void AddPredictedTick(int Tick, const CCharacterCore &Core)
+		{
+			m_aPredPos[Tick % 200] = Core.m_Pos;
+			m_aPredTick[Tick % 200] = Tick;
+			m_aPredHookPos[Tick % 200] = Core.m_HookPos;
+			m_aPredHookState[Tick % 200] = Core.m_HookState;
+			m_aPredHookedPlayer[Tick % 200] = Core.HookedPlayer();
+		}
 
 		void UpdateSkinInfo();
 		void UpdateSkin7HatSprite(int Dummy);
@@ -628,6 +642,7 @@ public:
 	void InvalidateSnapshot() override;
 	void OnNewSnapshot(bool DummySwapped) override;
 	void OnPredict() override;
+	bool CheckNewInput() override;
 	void OnActivateEditor() override;
 	void OnDummySwap() override;
 	int OnSnapInput(int *pData, bool Dummy, bool Force) override;
@@ -640,6 +655,7 @@ public:
 	virtual void OnStartRound();
 	virtual void OnFlagGrab(int TeamId);
 	void OnWindowResize() override;
+	void ApplyCustomFont();
 
 	void InitializeLanguage() override;
 	bool m_LanguageChanged = false;
@@ -681,6 +697,15 @@ public:
 	void SendReadyChange7(); // NOLINT(readability-make-member-function-const)
 
 	void ApplyPreInputs(int Tick, bool Direct, CGameWorld &GameWorld);
+	bool GetDummyFastInput(CNetObj_PlayerInput &DummyFastInput, const CNetObj_PlayerInput *pDummyInputData, const class CCharacter *pDummyChar, int LocalTee, int DummyTee) const;
+	// Fast / aggressive predictive input helpers (visual only; does not change server input)
+	bool FastInputEnabled() const;
+	bool FastInputAggressive() const;
+	float FastInputOffsetTicks() const;
+	int FastInputExtraTicks(bool ForOthers = false) const;
+	void ApplyFastInputOffset(float OffsetTicks, int &Tick, float &Intra) const;
+	bool GetFastInputSampleTick(int ClientId, int &Tick, float &Intra) const;
+	void ApplyFastInputHook(int ClientId);
 
 	int m_aNextChangeInfo[NUM_DUMMIES];
 
@@ -722,6 +747,8 @@ public:
 	CGameWorld m_GameWorld;
 	CGameWorld m_PredictedWorld;
 	CGameWorld m_PrevPredictedWorld;
+	CGameWorld m_RegularPredictedWorld;
+	CGameWorld m_PrevRegularPredictedWorld;
 
 	std::vector<SSwitchers> &Switchers() { return m_GameWorld.m_Core.m_vSwitchers; }
 	std::vector<SSwitchers> &PredSwitchers() { return m_PredictedWorld.m_Core.m_vSwitchers; }
@@ -961,6 +988,7 @@ private:
 	void DetectStrongHook();
 
 	vec2 GetSmoothPos(int ClientId);
+	vec2 GetFastInputPos(int ClientId);
 
 	int m_IsDummySwapping;
 	CCharOrder m_CharOrder;
