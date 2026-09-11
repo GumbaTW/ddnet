@@ -2705,6 +2705,7 @@ if(CLIENT)
     components/menus_ingame.cpp
     components/menus_ingame_touch_controls.cpp
     components/menus_ingame_touch_controls.h
+    components/menus_saves.cpp
     components/menus_settings.cpp
     components/menus_settings_appearance.cpp
     components/menus_settings_assets.cpp

@@ -699,6 +699,7 @@ public:
 		PAGE_SETTINGS,
 		PAGE_NETWORK,
 		PAGE_GHOST,
+		PAGE_SAVES,
 
 		PAGE_LENGTH,
 	};
@@ -806,6 +807,35 @@ public:
 	void DeleteGhostItem(int Index);
 	void SortGhostlist();
 
+	// Saves browser (ddnet-saves.txt)
+	struct CSaveItem
+	{
+		char m_aTime[32];
+		char m_aPlayers[1024];
+		char m_aMap[128];
+		char m_aCode[64];
+	};
+	enum
+	{
+		SAVES_SORT_DATE = 0,
+		SAVES_SORT_PLAYERS,
+		SAVES_SORT_MAP,
+	};
+	std::vector<CSaveItem> m_vSaves;
+	std::vector<int> m_vFilteredSaves;
+	CLineInputBuffered<64> m_SavesSearchInput;
+	bool m_SavesCurrentMapOnly = true;
+	bool m_SavesNeedReload = true;
+	int m_SavesSelectedIndex = 0;
+
+	void SavesPopulate();
+	void SavesSort();
+	void SavesRefreshFiltered();
+	bool SavesCanLoadSelected() const;
+	void SavesRequestLoadSelected();
+	void SavesLoadSelected();
+	void PopupConfirmLoadSave();
+
 	bool CanDisplayWarning() const;
 
 	void PopupWarning(const char *pTopic, const char *pBody, const char *pButton, std::chrono::nanoseconds Duration);
@@ -863,6 +893,8 @@ private:
 	void RenderInGameNetwork(CUIRect MainView);
 	void RenderGhost(CUIRect MainView);
 
+	// found in menus_saves.cpp
+	void RenderSaves(CUIRect MainView);
 	// found in menus_gclient.cpp
 	void RenderSettingsGClient(CUIRect MainView);
 };
