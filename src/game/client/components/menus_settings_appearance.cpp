@@ -80,6 +80,9 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 
 	if(s_CurTab == APPEARANCE_TAB_HUD)
 	{
+		CUIRect FrozenTeeView;
+		MainView.HSplitBottom(HeadlineHeight + MarginSmall + LineSize * 5.0f, &MainView, &FrozenTeeView);
+		MainView.HSplitBottom(MarginBetweenViews, &MainView, nullptr);
 		MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
 
 		CUIRect FontDropDownRect, FontDirectory, FontLabel;
@@ -191,6 +194,31 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		if(g_Config.m_ClShowFreezeBars)
 		{
 			Ui()->DoScrollbarOption(&g_Config.m_ClFreezeBarsAlphaInsideFreeze, &g_Config.m_ClFreezeBarsAlphaInsideFreeze, &Button, Localize("Opacity of freeze bars inside freeze"), 0, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
+		}
+
+		// ***** Frozen Tee Display ***** //
+		Ui()->DoLabel_AutoLineSize(Localize("Frozen Tee Display"), HeadlineFontSize,
+			TEXTALIGN_ML, &FrozenTeeView, HeadlineHeight);
+		FrozenTeeView.HSplitTop(MarginSmall, nullptr, &FrozenTeeView);
+		FrozenTeeView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
+
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowFrozenHud, Localize("Show frozen tee display"), &g_Config.m_ClShowFrozenHud, &LeftView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowFrozenHudSkins, Localize("Use skins instead of ninja tees"), &g_Config.m_ClShowFrozenHudSkins, &LeftView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFrozenHudTeamOnly, Localize("Only show after joining a team"), &g_Config.m_ClFrozenHudTeamOnly, &LeftView, LineSize);
+		LeftView.HSplitTop(LineSize, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_ClFrozenMaxRows, &g_Config.m_ClFrozenMaxRows, &Button, Localize("Max Rows"), 1, 6);
+		LeftView.HSplitTop(LineSize, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_ClFrozenHudTeeSize, &g_Config.m_ClFrozenHudTeeSize, &Button, Localize("Tee Size"), 8, 27);
+
+		RightView.HSplitTop(LineSize, &Button, &RightView);
+		if(DoButton_CheckBox(&g_Config.m_ClShowFrozenText, Localize("Tees left alive text"), g_Config.m_ClShowFrozenText >= 1, &Button))
+			g_Config.m_ClShowFrozenText = g_Config.m_ClShowFrozenText >= 1 ? 0 : 1;
+		if(g_Config.m_ClShowFrozenText)
+		{
+			RightView.HSplitTop(LineSize, &Button, &RightView);
+			static int s_CountFrozenText = 0;
+			if(DoButton_CheckBox(&s_CountFrozenText, Localize("Count frozen tees"), g_Config.m_ClShowFrozenText == 2, &Button))
+				g_Config.m_ClShowFrozenText = g_Config.m_ClShowFrozenText != 2 ? 2 : 1;
 		}
 	}
 	else if(s_CurTab == APPEARANCE_TAB_CHAT)
