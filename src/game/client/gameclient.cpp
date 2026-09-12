@@ -2869,7 +2869,6 @@ void CGameClient::OnPredict()
 			for(int i = 0; i < MAX_CLIENTS; i++)
 				if(CCharacter *pChar = m_PredictedWorld.GetCharacterById(i))
 					m_aClients[i].m_RegularPredicted = pChar->GetCore();
-			m_RegularPredictedWorld.CopyWorldClean(&m_PredictedWorld);
 		}
 
 		for(int i = 0; i < MAX_CLIENTS; i++)
@@ -2914,6 +2913,10 @@ void CGameClient::OnPredict()
 
 		if(Tick <= FinalTickRegular)
 			HandlePredictedEvents(Tick);
+
+		// Snapshot after handling so restored events keep m_Handled and are not replayed on repredict.
+		if(Tick == FinalTickRegular)
+			m_RegularPredictedWorld.CopyWorldClean(&m_PredictedWorld);
 	}
 
 	if(FastInputTicks > 0)
