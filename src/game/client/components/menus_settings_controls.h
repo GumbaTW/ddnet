@@ -82,6 +82,10 @@ private:
 	float MeasureSettingsMouseHeight() const;
 	void RenderSettingsMouse(CUIRect View);
 
+	std::vector<CButtonContainer> m_vFastInputModeButtonContainers = {{}, {}};
+	float MeasureSettingsFastInputHeight() const;
+	void RenderSettingsFastInput(CUIRect View);
+
 	std::vector<CButtonContainer> m_vJoystickIngameModeButtonContainers = {{}, {}};
 	char m_aaJoystickAxisCheckboxIds[NUM_JOYSTICK_AXES][2]; // 2 for X and Y buttons
 	CScrollRegion m_JoystickDropDownScrollRegion;

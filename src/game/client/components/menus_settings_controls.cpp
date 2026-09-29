@@ -182,6 +182,8 @@ void CMenusSettingsControls::Render(CUIRect MainView)
 	// Left column
 	RenderSettingsBlock(MeasureSettingsMouseHeight(), &LeftColumn,
 		Localize("Mouse"), nullptr, nullptr, std::bind_front(&CMenusSettingsControls::RenderSettingsMouse, this));
+	RenderSettingsBlock(MeasureSettingsFastInputHeight(), &LeftColumn,
+		Localize("Fast input"), nullptr, nullptr, std::bind_front(&CMenusSettingsControls::RenderSettingsFastInput, this));
 	RenderSettingsBlock(MeasureSettingsJoystickHeight(), &LeftColumn,
 		Localize("Controller"), nullptr, nullptr, std::bind_front(&CMenusSettingsControls::RenderSettingsJoystick, this));
 	RenderSettingsBindsBlock(EBindOptionGroup::MOVEMENT, &LeftColumn, Localize("Movement"));
@@ -575,6 +577,80 @@ void CMenusSettingsControls::RenderSettingsMouse(CUIRect View)
 	View.HSplitTop(BUTTON_HEIGHT, &Button, &View);
 	Ui()->DoScrollbarOption(&g_Config.m_UiMousesens, &g_Config.m_UiMousesens, &Button, Localize("UI mouse sens."), 1, 500,
 		&CUi::ms_LogarithmicScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE | CUi::SCROLLBAR_OPTION_DELAYUPDATE);
+}
+
+static bool DoDecimalScrollbarOption(CUi *pUi, const void *pId, int *pOption, const CUIRect *pRect, const char *pStr, int Min, int Max, int Scale, const IScrollbarScale *pScale, unsigned Flags, const char *pSuffix)
+{
+	const bool NoClampValue = Flags & CUi::SCROLLBAR_OPTION_NOCLAMPVALUE;
+
+	int Value = *pOption;
+	char aBuf[256];
+	str_format(aBuf, sizeof(aBuf), "%s: %.2f%s", pStr, Value / (float)Scale, pSuffix);
+
+	if(NoClampValue)
+		Value = std::clamp(Value, Min, Max);
+
+	CUIRect Label, ScrollBar;
+	pRect->VSplitMid(&Label, &ScrollBar, std::min(10.0f, pRect->w * 0.05f));
+
+	const float FontSize = Label.h * CUi::ms_FontmodHeight * 0.8f;
+	pUi->DoLabel(&Label, aBuf, FontSize, TEXTALIGN_ML);
+
+	Value = pScale->ToAbsolute(pUi->DoScrollbarH(pId, &ScrollBar, pScale->ToRelative(Value, Min, Max)), Min, Max);
+	if(NoClampValue && ((Value == Min && *pOption < Min) || (Value == Max && *pOption > Max)))
+		Value = *pOption;
+
+	if(*pOption != Value)
+	{
+		*pOption = Value;
+		return true;
+	}
+	return false;
+}
+
+float CMenusSettingsControls::MeasureSettingsFastInputHeight() const
+{
+	float Height = BUTTON_HEIGHT;
+	if(g_Config.m_GcFastInput)
+		Height += 3.0f * (BUTTON_HEIGHT + BUTTON_SPACING);
+	return Height;
+}
+
+void CMenusSettingsControls::RenderSettingsFastInput(CUIRect View)
+{
+	CUIRect Button;
+	View.HSplitTop(BUTTON_HEIGHT, &Button, &View);
+	const bool WasEnabled = g_Config.m_GcFastInput != 0;
+	if(GameClient()->m_Menus.DoButton_CheckBox(&g_Config.m_GcFastInput, Localize("Enable fast input"), g_Config.m_GcFastInput, &Button))
+		g_Config.m_GcFastInput ^= 1;
+	GameClient()->m_Tooltips.DoToolTip(&g_Config.m_GcFastInput, &Button, Localize("Predict from your current input before the next tick, so your tee reacts with less visual delay."));
+	if(!WasEnabled)
+		return;
+
+	GameClient()->m_Menus.DoLine_RadioMenu(View, Localize("Style"),
+		m_vFastInputModeButtonContainers,
+		{Localize("Classic", "Fast input style"), Localize("Aggressive", "Fast input style")},
+		{0, 1},
+		g_Config.m_GcFastInputMode);
+
+	View.HSplitTop(BUTTON_SPACING, nullptr, &View);
+	View.HSplitTop(BUTTON_HEIGHT, &Button, &View);
+	if(g_Config.m_GcFastInputMode == 1)
+	{
+		DoDecimalScrollbarOption(Ui(), &g_Config.m_GcFastInputTicks, &g_Config.m_GcFastInputTicks, &Button, Localize("Amount"), 0, 200, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ticks");
+		GameClient()->m_Tooltips.DoToolTip(&g_Config.m_GcFastInputTicks, &Button, Localize("Aggressive fast input predicts this many ticks ahead and repredicts every frame."));
+	}
+	else
+	{
+		Ui()->DoScrollbarOption(&g_Config.m_GcFastInputAmount, &g_Config.m_GcFastInputAmount, &Button, Localize("Amount"), 1, 40, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ms");
+		GameClient()->m_Tooltips.DoToolTip(&g_Config.m_GcFastInputAmount, &Button, Localize("Classic fast input adds this many milliseconds of prediction."));
+	}
+
+	View.HSplitTop(BUTTON_SPACING, nullptr, &View);
+	View.HSplitTop(BUTTON_HEIGHT, &Button, &View);
+	if(GameClient()->m_Menus.DoButton_CheckBox(&g_Config.m_GcFastInputOthers, Localize("Also apply to other players"), g_Config.m_GcFastInputOthers, &Button))
+		g_Config.m_GcFastInputOthers ^= 1;
+	GameClient()->m_Tooltips.DoToolTip(&g_Config.m_GcFastInputOthers, &Button, Localize("Also move other players forward by the same amount."));
 }
 
 float CMenusSettingsControls::MeasureSettingsJoystickHeight() const
