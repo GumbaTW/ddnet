@@ -23,6 +23,8 @@ jobs:
         include:
           - name: linux
             os: ubuntu-22.04
+            # Keep bundled static libs (FFmpeg and friends). SDL2 and FreeType
+            # have no usable Linux bundle, and the bundled libcurl.so is a stub.
             cmake-args: -G Ninja -DPREFER_BUNDLED_LIBS=ON -DIPO=ON
             package-glob: "*-linux_*.tar.xz"
           - name: windows
@@ -48,8 +50,9 @@ jobs:
           cmake
           libasound2-dev
           libcurl4-openssl-dev
+          libfreetype6-dev
           libgl1-mesa-dev
-          libssl-dev
+          libsdl2-dev
           libvulkan-dev
           libx11-dev
           libxcursor-dev
@@ -92,6 +95,9 @@ jobs:
     - name: Package
       shell: bash
       run: |
+        if [ "${{ matrix.name }}" = "linux" ]; then
+          rm -f ddnet-libs/curl/linux/lib64/libcurl.so
+        fi
         mkdir release
         cd release
         cmake ${{ matrix.cmake-args }} -DCMAKE_BUILD_TYPE=Release -DINFORM_UPDATE=OFF -DAUTOUPDATE=OFF -DDOWNLOAD_GTEST=OFF -DSERVER=OFF -DTOOLS=OFF -DCMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE=. ..
@@ -159,4 +165,4 @@ jobs:
 
           The executable is still named DDNet and uses your existing DDNet settings. This build does not update itself and does not link to the official DDNet download.
 
-          Windows SmartScreen and macOS Gatekeeper warn because these builds are unsigned. On macOS, right-click the app and choose Open. The Linux build needs glibc from Ubuntu 22.04 or newer.
+          Windows SmartScreen and macOS Gatekeeper warn because these builds are unsigned. On macOS, right-click the app and choose Open. The Linux build needs glibc from Ubuntu 22.04 or newer, plus SDL2, FreeType, and libcurl (`libsdl2-2.0-0`, `libfreetype6`, and `libcurl4` on Ubuntu).
