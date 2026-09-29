@@ -8,6 +8,7 @@
 #include <engine/keys.h>
 #include <engine/serverbrowser.h>
 #include <engine/shared/config.h>
+#include <engine/storage.h>
 #include <engine/textrender.h>
 
 #include <generated/client_data.h>
@@ -21,15 +22,23 @@
 #include <android/android_main.h>
 #endif
 
+void CMenusStart::OnInit()
+{
+	m_LogoTexture = Graphics()->LoadTexture("gui_logo_gclient.png", IStorage::TYPE_ALL);
+}
+
 void CMenusStart::RenderStartMenu(CUIRect MainView)
 {
 	GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_START);
 
-	// render logo
-	Graphics()->TextureSet(g_pData->m_aImages[IMAGE_BANNER].m_Id);
+	// render logo (GClient asset; fall back to DDNet banner if missing)
+	const bool HasGClientLogo = m_LogoTexture.IsValid() && !m_LogoTexture.IsNullTexture();
+	Graphics()->TextureSet(HasGClientLogo ? m_LogoTexture : g_pData->m_aImages[IMAGE_BANNER].m_Id);
 	Graphics()->QuadsBegin();
 	Graphics()->SetColor(1, 1, 1, 1);
-	IGraphics::CQuadItem QuadItem(MainView.w / 2 - 170, 60, 360, 103);
+	const float LogoWidth = 360.0f;
+	const float LogoHeight = HasGClientLogo ? (LogoWidth * (725.0f / 2169.0f)) : 103.0f;
+	IGraphics::CQuadItem QuadItem(MainView.w / 2 - LogoWidth / 2, 60, LogoWidth, LogoHeight);
 	Graphics()->QuadsDrawTL(&QuadItem, 1);
 	Graphics()->QuadsEnd();
 
