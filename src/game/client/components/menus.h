@@ -359,6 +359,7 @@ protected:
 	{
 		char m_aName[MAX_NAME_LENGTH];
 		char m_aClan[MAX_CLAN_LENGTH];
+		char m_aFolder[CFriendInfo::MAX_FOLDER_LENGTH];
 		const CServerInfo *m_pServerInfo;
 		int m_FriendState;
 		bool m_IsPlayer;
@@ -384,6 +385,7 @@ protected:
 		{
 			str_copy(m_aName, pFriendInfo->m_aName);
 			str_copy(m_aClan, pFriendInfo->m_aClan);
+			str_copy(m_aFolder, pFriendInfo->m_aFolder);
 			m_FriendState = m_aName[0] == '\0' ? IFriends::FRIEND_CLAN : IFriends::FRIEND_PLAYER;
 			m_aSkin[0] = '\0';
 			for(int Part = 0; Part < protocol7::NUM_SKINPARTS; Part++)
@@ -393,7 +395,7 @@ protected:
 				m_aCustomSkinColor7[Part] = 0;
 			}
 		}
-		CFriendItem(const CServerInfo::CClient &CurrentClient, const CServerInfo *pServerInfo) :
+		CFriendItem(const CServerInfo::CClient &CurrentClient, const CServerInfo *pServerInfo, const char *pFolder) :
 			m_pServerInfo(pServerInfo),
 			m_FriendState(CurrentClient.m_FriendState),
 			m_IsPlayer(CurrentClient.m_Player),
@@ -404,6 +406,7 @@ protected:
 		{
 			str_copy(m_aName, CurrentClient.m_aName);
 			str_copy(m_aClan, CurrentClient.m_aClan);
+			str_copy(m_aFolder, pFolder != nullptr ? pFolder : "");
 			str_copy(m_aSkin, CurrentClient.m_aSkin);
 			for(int Part = 0; Part < protocol7::NUM_SKINPARTS; Part++)
 			{
@@ -415,6 +418,7 @@ protected:
 
 		const char *Name() const { return m_aName; }
 		const char *Clan() const { return m_aClan; }
+		const char *Folder() const { return m_aFolder; }
 		const CServerInfo *ServerInfo() const { return m_pServerInfo; }
 		int FriendState() const { return m_FriendState; }
 		bool IsPlayer() const { return m_IsPlayer; }
@@ -431,6 +435,7 @@ protected:
 
 		const void *ListItemId() const { return &m_aName; }
 		const void *RemoveButtonId() const { return &m_FriendState; }
+		const void *FolderButtonId() const { return &m_aFolder; }
 		const void *CommunityTooltipId() const { return &m_IsPlayer; }
 		const void *SkinTooltipId() const { return &m_aSkin; }
 
@@ -450,6 +455,15 @@ protected:
 	};
 	std::vector<CFriendItem> m_avFriends[NUM_FRIEND_TYPES];
 	const CFriendItem *m_pRemoveFriend = nullptr;
+	bool m_MoveFriendToFolder = false;
+	char m_aMoveFriendName[MAX_NAME_LENGTH] = {'\0'};
+	char m_aMoveFriendClan[MAX_CLAN_LENGTH] = {'\0'};
+	int m_MoveFriendState = IFriends::FRIEND_NO;
+	float m_MoveFriendPopupX = 0.0f;
+	float m_MoveFriendPopupY = 0.0f;
+	float m_MoveFriendPopupH = 0.0f;
+	bool m_RemoveFriendFolder = false;
+	char m_aRemoveFriendFolder[CFriendInfo::MAX_FOLDER_LENGTH] = {'\0'};
 
 	// found in menus.cpp
 	void Render();
@@ -543,8 +557,10 @@ protected:
 	void RenderServerbrowserInfo(CUIRect View);
 	void RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *pSelectedServer);
 	void RenderServerbrowserFriends(CUIRect View);
+	void RenderServerbrowserFriendEntry(CUIRect &List, CScrollRegion &ScrollRegion, const CFriendItem &Friend, float FontSize, float SpacingH);
 	void FriendlistOnUpdate();
 	void PopupConfirmRemoveFriend();
+	void PopupConfirmRemoveFriendFolder();
 	void RenderServerbrowserTabBar(CUIRect TabBar);
 	void RenderServerbrowserToolBox(CUIRect ToolBox);
 	void RenderServerbrowser(CUIRect MainView);
