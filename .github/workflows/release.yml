@@ -5,6 +5,12 @@ on:
     tags:
       - "gclient-*"
   workflow_dispatch:
+    inputs:
+      platform:
+        description: "Build only this platform: linux, windows, or macos. Leave empty to build all."
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -16,6 +22,7 @@ concurrency:
 jobs:
   package:
     name: ${{ matrix.name }}
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == '' || inputs.platform == matrix.name
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -52,6 +59,7 @@ jobs:
           libcurl4-openssl-dev
           libfreetype6-dev
           libgl1-mesa-dev
+          libnotify-dev
           libsdl2-dev
           libvulkan-dev
           libx11-dev
@@ -165,4 +173,4 @@ jobs:
 
           The executable is still named DDNet and uses your existing DDNet settings. This build does not update itself and does not link to the official DDNet download.
 
-          Windows SmartScreen and macOS Gatekeeper warn because these builds are unsigned. On macOS, right-click the app and choose Open. The Linux build needs glibc from Ubuntu 22.04 or newer, plus SDL2, FreeType, and libcurl (`libsdl2-2.0-0`, `libfreetype6`, and `libcurl4` on Ubuntu).
+          Windows SmartScreen and macOS Gatekeeper warn because these builds are unsigned. On macOS, right-click the app and choose Open. The Linux build needs glibc from Ubuntu 22.04 or newer, plus SDL2, FreeType, libcurl, and libnotify (`libsdl2-2.0-0`, `libfreetype6`, `libcurl4`, and `libnotify4` on Ubuntu).
