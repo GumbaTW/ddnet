@@ -1760,14 +1760,17 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 
 		str_format(aBuf, sizeof(aBuf), "%s (%d)", pFolder, (int)vpItems.size());
 		Ui()->DoLabel(&GroupLabel, aBuf, FontSize, TEXTALIGN_ML);
-		GameClient()->m_Tooltips.DoToolTip(pSlot->m_aName, &RemoveFolderButton, Localize("Remove this folder. Friends in it stay on your list."));
+		GameClient()->m_Tooltips.DoToolTip(pSlot->m_aName, &RemoveFolderButton, vpItems.empty() ? Localize("Remove this folder.") : Localize("Remove this folder. Friends in it are moved out of the folder."));
 
-		if(Ui()->MouseHovered(&RemoveFolderButton) && Ui()->DoButtonLogic(pSlot->m_aName, 0, &RemoveFolderButton, BUTTONFLAG_LEFT))
+		// The header covers the trash icon. Only the icon may take the click, otherwise the header
+		// steals the hot item and the button stays inactive.
+		const bool OverRemoveFolder = Ui()->MouseHovered(&RemoveFolderButton);
+		if(OverRemoveFolder && Ui()->DoButtonLogic(pSlot->m_aName, 0, &RemoveFolderButton, BUTTONFLAG_LEFT))
 		{
 			str_copy(m_aRemoveFriendFolder, pFolder);
 			m_RemoveFriendFolder = true;
 		}
-		else if(Ui()->DoButtonLogic(&pSlot->m_Extended, 0, &Header, BUTTONFLAG_LEFT))
+		else if(!OverRemoveFolder && Ui()->DoButtonLogic(&pSlot->m_Extended, 0, &HeaderMain, BUTTONFLAG_LEFT))
 		{
 			pSlot->m_Extended = !pSlot->m_Extended;
 		}
@@ -1911,9 +1914,26 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 	}
 	else if(m_RemoveFriendFolder)
 	{
-		char aMessage[256];
-		str_format(aMessage, sizeof(aMessage), Localize("Are you sure that you want to remove the folder '%s'? Friends in it stay on your list."), m_aRemoveFriendFolder);
-		PopupConfirm(Localize("Remove folder"), aMessage, Localize("Yes"), Localize("No"), &CMenus::PopupConfirmRemoveFriendFolder);
+		bool FolderHasFriends = false;
+		for(int FriendIndex = 0; FriendIndex < GameClient()->Friends()->NumFriends(); ++FriendIndex)
+		{
+			if(str_comp(GameClient()->Friends()->GetFriend(FriendIndex)->m_aFolder, m_aRemoveFriendFolder) == 0)
+			{
+				FolderHasFriends = true;
+				break;
+			}
+		}
+		if(!FolderHasFriends)
+		{
+			GameClient()->Friends()->RemoveFolder(m_aRemoveFriendFolder);
+			m_aRemoveFriendFolder[0] = '\0';
+		}
+		else
+		{
+			char aMessage[256];
+			str_format(aMessage, sizeof(aMessage), Localize("Are you sure that you want to remove the folder '%s'? Friends in it will be moved out of the folder."), m_aRemoveFriendFolder);
+			PopupConfirm(Localize("Remove folder"), aMessage, Localize("Yes"), Localize("No"), &CMenus::PopupConfirmRemoveFriendFolder);
+		}
 		m_RemoveFriendFolder = false;
 	}
 
