@@ -44,6 +44,8 @@ void CChat::CLine::Reset(CChat &This)
 	m_aText[0] = '\0';
 	m_aName[0] = '\0';
 	m_Friend = false;
+	m_HiddenByFriends = false;
+	m_HiddenByTeam = false;
 	m_TimesRepeated = 0;
 	m_pManagedTeeRenderInfo = nullptr;
 }
@@ -121,6 +123,9 @@ void CChat::ClearLines()
 		Line.Reset(*this);
 	m_PrevScoreBoardShowed = false;
 	m_PrevShowChat = false;
+	m_PrevShowChatSystem = g_Config.m_ClShowChatSystem != 0;
+	m_PrevShowChatFriends = g_Config.m_ClShowChatFriends != 0;
+	m_PrevShowChatTeamMembersOnly = g_Config.m_ClShowChatTeamMembersOnly != 0;
 }
 
 void CChat::OnWindowResize()
@@ -607,6 +612,17 @@ bool CChat::LineShouldHighlight(const char *pLine, const char *pName)
 	return false;
 }
 
+bool CChat::LineIsFiltered(const CLine &Line) const
+{
+	if(Line.m_ClientId == SERVER_MSG && !g_Config.m_ClShowChatSystem)
+		return true;
+	if(Line.m_HiddenByFriends && g_Config.m_ClShowChatFriends)
+		return true;
+	if(Line.m_HiddenByTeam && g_Config.m_ClShowChatTeamMembersOnly)
+		return true;
+	return false;
+}
+
 static constexpr const char *SAVES_HEADER[] = {
 	"Time",
 	"Player",
@@ -659,11 +675,8 @@ void CChat::StoreSave(const char *pText)
 void CChat::AddLine(int ClientId, int Team, const char *pLine)
 {
 	if(*pLine == 0 ||
-		(ClientId == SERVER_MSG && !g_Config.m_ClShowChatSystem) ||
 		(ClientId >= 0 && (GameClient()->m_aClients[ClientId].m_aName[0] == '\0' || // unknown client
 					  GameClient()->m_aClients[ClientId].m_ChatIgnore ||
-					  (GameClient()->m_Snap.m_LocalClientId != ClientId && g_Config.m_ClShowChatFriends && !GameClient()->m_aClients[ClientId].m_Friend) ||
-					  (GameClient()->m_Snap.m_LocalClientId != ClientId && g_Config.m_ClShowChatTeamMembersOnly && GameClient()->IsOtherTeam(ClientId) && GameClient()->m_Teams.Team(GameClient()->m_Snap.m_LocalClientId) != TEAM_FLOCK) ||
 					  (GameClient()->m_Snap.m_LocalClientId != ClientId && GameClient()->m_aClients[ClientId].m_Foe))))
 		return;
 
@@ -759,7 +772,8 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 		PreviousLine.m_aYOffset[0] = -1.0f;
 		PreviousLine.m_aYOffset[1] = -1.0f;
 
-		FChatMsgCheckAndPrint(PreviousLine);
+		if(!LineIsFiltered(PreviousLine))
+			FChatMsgCheckAndPrint(PreviousLine);
 		return;
 	}
 
@@ -772,6 +786,14 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 	CurrentLine.m_aYOffset[0] = -1.0f;
 	CurrentLine.m_aYOffset[1] = -1.0f;
 	CurrentLine.m_ClientId = ClientId;
+	CurrentLine.m_HiddenByFriends = false;
+	CurrentLine.m_HiddenByTeam = false;
+	if(ClientId >= 0 && GameClient()->m_Snap.m_LocalClientId != ClientId)
+	{
+		CurrentLine.m_HiddenByFriends = !GameClient()->m_aClients[ClientId].m_Friend;
+		CurrentLine.m_HiddenByTeam = GameClient()->IsOtherTeam(ClientId) &&
+					     GameClient()->m_Teams.Team(GameClient()->m_Snap.m_LocalClientId) != TEAM_FLOCK;
+	}
 	CurrentLine.m_TeamNumber = Team;
 	CurrentLine.m_Team = Team == 1;
 	CurrentLine.m_Whisper = Team >= 2;
@@ -861,6 +883,9 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 		}
 	}
 
+	if(LineIsFiltered(CurrentLine))
+		return;
+
 	FChatMsgCheckAndPrint(CurrentLine);
 
 	// play sound
@@ -926,9 +951,17 @@ void CChat::OnPrepareLines(float y)
 
 	const bool IsScoreBoardOpen = GameClient()->m_Scoreboard.IsActive() && (Graphics()->ScreenAspect() > 1.7f); // only assume scoreboard when screen ratio is widescreen(something around 16:9)
 	const bool ShowLargeArea = m_Show || (m_Mode != MODE_NONE && g_Config.m_ClShowChat == 1) || g_Config.m_ClShowChat == 2;
-	const bool ForceRecreate = IsScoreBoardOpen != m_PrevScoreBoardShowed || ShowLargeArea != m_PrevShowChat;
+	const bool ShowChatSystem = g_Config.m_ClShowChatSystem != 0;
+	const bool FriendsOnly = g_Config.m_ClShowChatFriends != 0;
+	const bool TeamMembersOnly = g_Config.m_ClShowChatTeamMembersOnly != 0;
+	const bool ForceRecreate = IsScoreBoardOpen != m_PrevScoreBoardShowed || ShowLargeArea != m_PrevShowChat ||
+				    ShowChatSystem != m_PrevShowChatSystem || FriendsOnly != m_PrevShowChatFriends ||
+				    TeamMembersOnly != m_PrevShowChatTeamMembersOnly;
 	m_PrevScoreBoardShowed = IsScoreBoardOpen;
 	m_PrevShowChat = ShowLargeArea;
+	m_PrevShowChatSystem = ShowChatSystem;
+	m_PrevShowChatFriends = FriendsOnly;
+	m_PrevShowChatTeamMembersOnly = TeamMembersOnly;
 
 	const int TeeSize = MessageTeeSize();
 	float RealMsgPaddingX = MessagePaddingX();
@@ -957,6 +990,17 @@ void CChat::OnPrepareLines(float y)
 			break;
 		if(Now > Line.m_Time + 16 * time_freq() && !m_PrevShowChat)
 			break;
+		if(LineIsFiltered(Line))
+		{
+			if(Line.m_TextContainerIndex.Valid() || Line.m_QuadContainerIndex != -1)
+			{
+				TextRender()->DeleteTextContainer(Line.m_TextContainerIndex);
+				Graphics()->DeleteQuadContainer(Line.m_QuadContainerIndex);
+				Line.m_aYOffset[0] = -1.0f;
+				Line.m_aYOffset[1] = -1.0f;
+			}
+			continue;
+		}
 
 		if(Line.m_TextContainerIndex.Valid() && !ForceRecreate)
 			continue;
@@ -1275,6 +1319,8 @@ void CChat::OnRender()
 			break;
 		if(Now > Line.m_Time + 16 * time_freq() && !m_PrevShowChat)
 			break;
+		if(LineIsFiltered(Line))
+			continue;
 
 		y -= Line.m_aYOffset[OffsetType];
 

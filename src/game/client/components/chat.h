@@ -49,6 +49,8 @@ class CChat : public CComponent
 		char m_aName[64];
 		char m_aText[MAX_CHAT_LENGTH];
 		bool m_Friend;
+		bool m_HiddenByFriends;
+		bool m_HiddenByTeam;
 		bool m_Highlighted;
 		std::optional<ColorRGBA> m_CustomColor;
 
@@ -64,6 +66,9 @@ class CChat : public CComponent
 
 	bool m_PrevScoreBoardShowed;
 	bool m_PrevShowChat;
+	bool m_PrevShowChatSystem;
+	bool m_PrevShowChatFriends;
+	bool m_PrevShowChatTeamMembersOnly;
 
 	CLine m_aLines[MAX_LINES];
 	int m_CurrentLine;
@@ -157,6 +162,7 @@ class CChat : public CComponent
 	static void ConchainChatWidth(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 
 	bool LineShouldHighlight(const char *pLine, const char *pName);
+	bool LineIsFiltered(const CLine &Line) const;
 	void StoreSave(const char *pText);
 
 public:
