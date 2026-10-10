@@ -489,7 +489,7 @@ void CMenus::RenderSaves(CUIRect MainView)
 		m_SavesNeedReload = true;
 		SavesPopulate();
 	}
-	GameClient()->m_Tooltips.DoToolTip(&s_ReloadButton, &Button, Localize("Refresh"));
+	Ui()->DoToolTip(&s_ReloadButton, &Button, Localize("Refresh"));
 
 	Status.VSplitLeft(5.0f, nullptr, &Status);
 	Status.VSplitLeft(175.0f, &Button, &Status);
@@ -518,5 +518,5 @@ void CMenus::RenderSaves(CUIRect MainView)
 		SavesRequestLoadSelected();
 	}
 	if(!CanLoad)
-		GameClient()->m_Tooltips.DoToolTip(&s_LoadButton, &Button, Localize("Save is for a different map"));
+		Ui()->DoToolTip(&s_LoadButton, &Button, Localize("Save is for a different map"));
 }
