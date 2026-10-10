@@ -122,7 +122,7 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 			Storage()->GetCompletePath(IStorage::TYPE_SAVE, "fonts/custom", aFontDir, sizeof(aFontDir));
 			Client()->ViewFile(aFontDir);
 		}
-		GameClient()->m_Tooltips.DoToolTip(&s_FontDirectoryId, &FontDirectory, Localize("Open the directory to add custom fonts"));
+		Ui()->DoToolTip(&s_FontDirectoryId, &FontDirectory, Localize("Open the directory to add custom fonts"));
 
 		LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
 

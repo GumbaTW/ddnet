@@ -625,7 +625,7 @@ void CMenusSettingsControls::RenderSettingsFastInput(CUIRect View)
 	const bool WasEnabled = g_Config.m_GcFastInput != 0;
 	if(GameClient()->m_Menus.DoButton_CheckBox(&g_Config.m_GcFastInput, Localize("Enable fast input"), g_Config.m_GcFastInput, &Button))
 		g_Config.m_GcFastInput ^= 1;
-	GameClient()->m_Tooltips.DoToolTip(&g_Config.m_GcFastInput, &Button, Localize("Predict from your current input before the next tick, so your tee reacts with less visual delay."));
+	Ui()->DoToolTip(&g_Config.m_GcFastInput, &Button, Localize("Predict from your current input before the next tick, so your tee reacts with less visual delay."));
 	if(!WasEnabled)
 		return;
 
@@ -640,19 +640,19 @@ void CMenusSettingsControls::RenderSettingsFastInput(CUIRect View)
 	if(g_Config.m_GcFastInputMode == 1)
 	{
 		DoDecimalScrollbarOption(Ui(), &g_Config.m_GcFastInputTicks, &g_Config.m_GcFastInputTicks, &Button, Localize("Amount"), 0, 200, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ticks");
-		GameClient()->m_Tooltips.DoToolTip(&g_Config.m_GcFastInputTicks, &Button, Localize("Aggressive fast input predicts this many ticks ahead and repredicts every frame."));
+		Ui()->DoToolTip(&g_Config.m_GcFastInputTicks, &Button, Localize("Aggressive fast input predicts this many ticks ahead and repredicts every frame."));
 	}
 	else
 	{
 		Ui()->DoScrollbarOption(&g_Config.m_GcFastInputAmount, &g_Config.m_GcFastInputAmount, &Button, Localize("Amount"), 1, 40, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " ms");
-		GameClient()->m_Tooltips.DoToolTip(&g_Config.m_GcFastInputAmount, &Button, Localize("Classic fast input adds this many milliseconds of prediction."));
+		Ui()->DoToolTip(&g_Config.m_GcFastInputAmount, &Button, Localize("Classic fast input adds this many milliseconds of prediction."));
 	}
 
 	View.HSplitTop(BUTTON_SPACING, nullptr, &View);
 	View.HSplitTop(BUTTON_HEIGHT, &Button, &View);
 	if(GameClient()->m_Menus.DoButton_CheckBox(&g_Config.m_GcFastInputOthers, Localize("Also apply to other players"), g_Config.m_GcFastInputOthers, &Button))
 		g_Config.m_GcFastInputOthers ^= 1;
-	GameClient()->m_Tooltips.DoToolTip(&g_Config.m_GcFastInputOthers, &Button, Localize("Also move other players forward by the same amount."));
+	Ui()->DoToolTip(&g_Config.m_GcFastInputOthers, &Button, Localize("Also move other players forward by the same amount."));
 }
 
 float CMenusSettingsControls::MeasureSettingsJoystickHeight() const
