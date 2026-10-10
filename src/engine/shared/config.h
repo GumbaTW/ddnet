@@ -51,6 +51,7 @@ public:
 		Description: Desc */ \
 	char m_##Name[Len]; // Flawfinder: ignore
 #include "config_variables.h"
+#include "config_variables_gclient.h"
 #undef MACRO_CONFIG_INT
 #undef MACRO_CONFIG_COL
 #undef MACRO_CONFIG_STR
@@ -73,6 +74,7 @@ namespace DefaultConfig
 	/** Default value of the string config variable 'ScriptName' (see CConfig::m_##Name). */ \
 	static constexpr const char *const Name = Def;
 #include "config_variables.h"
+#include "config_variables_gclient.h"
 #undef MACRO_CONFIG_INT
 #undef MACRO_CONFIG_COL
 #undef MACRO_CONFIG_STR

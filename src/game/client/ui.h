@@ -799,6 +799,7 @@ public:
 		float m_Width;
 		float m_AlignmentHeight;
 		bool m_TransparentButtons;
+		bool m_PreviewFontFaces = false;
 
 		SSelectionPopupContext();
 		void Reset();

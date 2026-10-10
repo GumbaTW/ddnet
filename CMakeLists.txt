@@ -117,7 +117,8 @@ option(WEBSOCKETS "Enable websockets support" OFF)
 option(MYSQL "Enable mysql support" OFF)
 option(TEST_MYSQL "Test mysql support in unit tests (also sets -DMYSQL=ON)" OFF)
 option(AUTOUPDATE "Enable the autoupdater" OFF)
-option(INFORM_UPDATE "Inform about available updates" ON)
+# GClient must not offer the official DDNet download.
+option(INFORM_UPDATE "Inform about available updates" OFF)
 option(VIDEORECORDER "Enable video recording support via FFmpeg" ON)
 option(UPNP "Enable UPnP support" OFF)
 option(ANTIBOT "Enable support for a dynamic anticheat library (not provided, see src/antibot for interface if you want to implement your own)" OFF)
@@ -1649,12 +1650,22 @@ set(EXPECTED_DATA
   fonts/Font_Awesome_6_Free-Solid-900.otf
   fonts/GlowSansJ-Compressed-Book.otf
   fonts/SourceHanSans.ttc
+  fonts/custom/Cabin-Regular.ttf
+  fonts/custom/FreeSansBold.ttf
+  fonts/custom/GoogleSans-Regular.ttf
+  fonts/custom/Inter_24pt-Regular.ttf
+  fonts/custom/Inter_24pt-SemiBold.ttf
+  fonts/custom/Montserrat-Regular.ttf
+  fonts/custom/Nunito-Black.ttf
+  fonts/custom/Rubik-Regular.ttf
+  fonts/custom/minecraft_font.ttf
   fonts/index.json
   game.png
   gui_buttons.png
   gui_cursor.png
   gui_icons.png
   gui_logo.png
+  gui_logo_gclient.png
   hud.png
   languages/README.txt
   languages/arabic.txt
@@ -2341,6 +2352,7 @@ set_src(ENGINE_SHARED GLOB_RECURSE src/engine/shared
   config.cpp
   config.h
   config_variables.h
+  config_variables_gclient.h
   console.cpp
   console.h
   csv.cpp
@@ -2705,6 +2717,7 @@ if(CLIENT)
     components/menus_ingame.cpp
     components/menus_ingame_touch_controls.cpp
     components/menus_ingame_touch_controls.h
+    components/menus_saves.cpp
     components/menus_settings.cpp
     components/menus_settings_appearance.cpp
     components/menus_settings_assets.cpp

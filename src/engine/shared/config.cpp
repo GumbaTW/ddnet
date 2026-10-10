@@ -324,6 +324,7 @@ void CConfigManager::Init()
 #define MACRO_CONFIG_STR(Name, ScriptName, Len, Def, Flags, Desc) AddStringVariable(#ScriptName, Flags, Desc, g_Config.m_##Name, Len, Def);
 
 #include "config_variables.h"
+#include "config_variables_gclient.h"
 
 #undef MACRO_CONFIG_INT
 #undef MACRO_CONFIG_COL

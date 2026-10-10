@@ -17,9 +17,11 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
+#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <limits>
+#include <string>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
@@ -30,6 +32,16 @@ enum
 {
 	FONT_NAME_SIZE = 128,
 };
+
+static void GetFaceDisplayName(FT_Face Face, char *pBuf, size_t BufSize)
+{
+	const char *pFamily = Face->family_name ? Face->family_name : "";
+	const char *pStyle = Face->style_name ? Face->style_name : "";
+	if(pStyle[0] != '\0')
+		str_format(pBuf, BufSize, "%s %s", pFamily, pStyle);
+	else
+		str_copy(pBuf, pFamily, BufSize);
+}
 
 struct SGlyph
 {
@@ -607,6 +619,8 @@ public:
 		}
 	}
 
+	const std::vector<FT_Face> &Faces() const { return m_vFtFaces; }
+
 	FT_Face DefaultFace() const
 	{
 		return m_DefaultFace;
@@ -980,6 +994,9 @@ class CTextRender : public IEngineTextRender
 
 	std::chrono::nanoseconds m_CursorRenderTime;
 
+	std::vector<std::string> m_vFontFaces;
+	std::vector<std::string> m_vDefaultFontFaces;
+
 	int GetFreeTextContainerIndex()
 	{
 		if(m_FirstFreeTextContainerIndex == -1)
@@ -1076,6 +1093,82 @@ class CTextRender : public IEngineTextRender
 		}
 
 		return true;
+	}
+
+	static int FontFileListCallback(const char *pFilename, int IsDir, int StorageType, void *pUser)
+	{
+		std::vector<std::string> *pVector = static_cast<std::vector<std::string> *>(pUser);
+		if(IsDir || pFilename[0] == '.')
+			return 0;
+		if(str_endswith_nocase(pFilename, ".ttf") == nullptr &&
+			str_endswith_nocase(pFilename, ".otf") == nullptr &&
+			str_endswith_nocase(pFilename, ".ttc") == nullptr)
+		{
+			return 0;
+		}
+		pVector->emplace_back(pFilename);
+		return 0;
+	}
+
+	void RecordDefaultFaces()
+	{
+		m_vDefaultFontFaces.clear();
+		for(const auto &CurrentFace : m_pGlyphMap->Faces())
+		{
+			char aBuf[FONT_NAME_SIZE];
+			GetFaceDisplayName(CurrentFace, aBuf, sizeof(aBuf));
+			m_vDefaultFontFaces.emplace_back(aBuf);
+		}
+	}
+
+	void UpdateFontFaceList()
+	{
+		m_vFontFaces.clear();
+		m_vFontFaces.emplace_back("DejaVu Sans");
+		for(const auto &CurrentFace : m_pGlyphMap->Faces())
+		{
+			char aBuf[FONT_NAME_SIZE];
+			GetFaceDisplayName(CurrentFace, aBuf, sizeof(aBuf));
+			if(std::find(m_vDefaultFontFaces.begin(), m_vDefaultFontFaces.end(), aBuf) == m_vDefaultFontFaces.end())
+			{
+				if(std::find(m_vFontFaces.begin(), m_vFontFaces.end(), aBuf) == m_vFontFaces.end())
+					m_vFontFaces.emplace_back(aBuf);
+			}
+		}
+	}
+
+	void LoadCustomFonts()
+	{
+		RecordDefaultFaces();
+
+		std::vector<std::string> vCustomFonts;
+		Storage()->ListDirectory(IStorage::TYPE_ALL, "fonts/custom", FontFileListCallback, &vCustomFonts);
+		std::sort(vCustomFonts.begin(), vCustomFonts.end());
+		vCustomFonts.erase(std::unique(vCustomFonts.begin(), vCustomFonts.end()), vCustomFonts.end());
+		for(const std::string &Filename : vCustomFonts)
+		{
+			char aFontName[IO_MAX_PATH_LENGTH];
+			str_format(aFontName, sizeof(aFontName), "fonts/custom/%s", Filename.c_str());
+			void *pFontData;
+			unsigned FontDataSize;
+			if(Storage()->ReadFile(aFontName, IStorage::TYPE_ALL, &pFontData, &FontDataSize))
+			{
+				if(LoadFontCollection(aFontName, static_cast<FT_Byte *>(pFontData), (FT_Long)FontDataSize))
+				{
+					m_vpFontData.push_back(pFontData);
+				}
+				else
+				{
+					free(pFontData);
+				}
+			}
+			else
+			{
+				log_error("textrender", "Failed to open/read font file '%s'", aFontName);
+			}
+		}
+
+		UpdateFontFaceList();
 	}
 
 	void SetRenderFlags(unsigned Flags) override
@@ -1327,8 +1420,21 @@ public:
 			Success = false;
 		}
 
+		LoadCustomFonts();
+		m_pGlyphMap->AddFallbackFaceByName("DejaVu Sans");
+
 		json_value_free(pJsonData);
 		return Success;
+	}
+
+	const std::vector<std::string> &GetFontFaces() const override
+	{
+		return m_vFontFaces;
+	}
+
+	void SetFontFace(const char *pFace) override
+	{
+		m_pGlyphMap->SetDefaultFaceByName(pFace);
 	}
 
 	void SetFontPreset(EFontPreset FontPreset) override
