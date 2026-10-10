@@ -183,6 +183,7 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowhudPlayerPosition, Localize("Show player position"), &g_Config.m_ClShowhudPlayerPosition, &RightView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowhudPlayerSpeed, Localize("Show player speed"), &g_Config.m_ClShowhudPlayerSpeed, &RightView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowhudPlayerAngle, Localize("Show player target angle"), &g_Config.m_ClShowhudPlayerAngle, &RightView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowhudPlayerCheckpoint, Localize("Show last checkpoint"), &g_Config.m_ClShowhudPlayerCheckpoint, &RightView, LineSize);
 
 		// Dummy movement information display settings
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowhudDummyPosition, Localize("Show dummy position"), &g_Config.m_ClShowhudDummyPosition, &RightView, LineSize);

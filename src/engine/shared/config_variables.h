@@ -82,6 +82,7 @@ MACRO_CONFIG_INT(ClShowhudDummyActions, cl_showhud_dummy_actions, 1, 0, 1, CFGFL
 MACRO_CONFIG_INT(ClShowhudPlayerPosition, cl_showhud_player_position, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show ingame HUD (Player Position)")
 MACRO_CONFIG_INT(ClShowhudPlayerSpeed, cl_showhud_player_speed, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show ingame HUD (Player Speed)")
 MACRO_CONFIG_INT(ClShowhudPlayerAngle, cl_showhud_player_angle, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show ingame HUD (Player Aim Angle)")
+MACRO_CONFIG_INT(ClShowhudPlayerCheckpoint, cl_showhud_player_checkpoint, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show ingame HUD (Last Collected Checkpoint)")
 MACRO_CONFIG_INT(ClShowhudDummyPosition, cl_showhud_dummy_position, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show ingame HUD (Dummy Position)")
 MACRO_CONFIG_INT(ClShowhudDummySpeed, cl_showhud_dummy_speed, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show ingame HUD (Dummy Speed)")
 MACRO_CONFIG_INT(ClShowhudDummyAngle, cl_showhud_dummy_angle, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show ingame HUD (Dummy Aim Angle)")
