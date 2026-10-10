@@ -35,6 +35,7 @@ CCharacter::CCharacter(CGameWorld *pWorld, CNetObj_PlayerInput LastInput) :
 	m_Armor = 0;
 	m_TriggeredEvents7 = 0;
 	m_StrongWeakId = 0;
+	m_Paused = false;
 
 	m_Input = LastInput;
 	// never initialize both to zero

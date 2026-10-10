@@ -59,7 +59,10 @@ void CGameTeams::ResetRoundState(int Team)
 		ResetSwitchers(Team);
 
 	if(!m_pGameContext->PracticeByDefault())
+	{
 		m_aPractice[Team] = false;
+		RevertTeamPauseSpec(Team);
+	}
 	m_aTeamUnfinishableKillTick[Team] = -1;
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
@@ -503,6 +506,33 @@ void CGameTeams::SetForceCharacterTeam(int ClientId, int Team)
 			ChangeTeamState(Team, ETeamState::OPEN);
 
 		ResetSwitchers(Team);
+	}
+
+	RevertPauseSpec(ClientId);
+}
+
+void CGameTeams::RevertPauseSpec(int ClientId)
+{
+	if(g_Config.m_SvPauseable)
+		return;
+
+	CPlayer *pPlayer = GetPlayer(ClientId);
+	if(!pPlayer || pPlayer->IsPaused() != -1 * CPlayer::PAUSE_SPEC)
+		return;
+
+	if(IsPractice(m_Core.Team(ClientId)))
+		return;
+
+	// Character may already be dead, but Pause still updates the player while the object exists.
+	pPlayer->Pause(CPlayer::PAUSE_PAUSED, true);
+}
+
+void CGameTeams::RevertTeamPauseSpec(int Team)
+{
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+	{
+		if(m_Core.Team(ClientId) == Team)
+			RevertPauseSpec(ClientId);
 	}
 }
 
@@ -1280,7 +1310,10 @@ void CGameTeams::OnCharacterSpawn(int ClientId)
 	int Team = m_Core.Team(ClientId);
 
 	if(GetSaving(Team))
+	{
+		RevertPauseSpec(ClientId);
 		return;
+	}
 
 	if(!IsValidTeamNumber(Team) || !m_aTeamLocked[Team])
 	{
@@ -1291,6 +1324,8 @@ void CGameTeams::OnCharacterSpawn(int ClientId)
 		if(!m_aTeamFlock[Team])
 			CheckTeamFinished(Team);
 	}
+
+	RevertPauseSpec(ClientId);
 }
 
 void CGameTeams::OnCharacterDeath(int ClientId, int Weapon)
@@ -1331,19 +1366,8 @@ void CGameTeams::OnCharacterDeath(int ClientId, int Weapon)
 
 			if(!m_pGameContext->PracticeByDefault())
 			{
-				if(!g_Config.m_SvPauseable)
-				{
-					for(int ClientId1 = 0; ClientId1 < MAX_CLIENTS; ClientId1++)
-					{
-						if(m_Core.Team(ClientId1) == Team)
-						{
-							CPlayer *pPlayer = GameServer()->m_apPlayers[ClientId1];
-							if(pPlayer && pPlayer->IsPaused() == -1 * CPlayer::PAUSE_SPEC)
-								pPlayer->Pause(CPlayer::PAUSE_PAUSED, true);
-						}
-					}
-				}
 				m_aPractice[Team] = false;
+				RevertTeamPauseSpec(Team);
 			}
 
 			if(TeamSize(Team) > 1)

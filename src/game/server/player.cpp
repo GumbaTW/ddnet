@@ -902,6 +902,11 @@ void CPlayer::ProcessPause()
 
 	if(m_Paused == PAUSE_SPEC && !m_pCharacter->IsPaused() && CanSpec())
 	{
+		// Practice may have ended while /spec was still waiting to hide the tee.
+		GameServer()->m_pController->Teams().RevertPauseSpec(m_ClientId);
+		if(m_Paused != PAUSE_SPEC)
+			return;
+
 		m_pCharacter->Pause(true);
 		GameServer()->CreateDeath(m_pCharacter->m_Pos, m_ClientId, GameServer()->m_pController->GetMaskForPlayerWorldEvent(m_ClientId));
 		GameServer()->CreateSound(m_pCharacter->m_Pos, SOUND_PLAYER_DIE, GameServer()->m_pController->GetMaskForPlayerWorldEvent(m_ClientId));

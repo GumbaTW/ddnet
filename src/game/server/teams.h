@@ -87,6 +87,9 @@ public:
 	void OnCharacterFinish(int ClientId);
 	void OnCharacterSpawn(int ClientId);
 	void OnCharacterDeath(int ClientId, int Weapon);
+	// sv_pauseable 0 only allows vanishing /spec during practice. Drop it once that no longer applies.
+	void RevertPauseSpec(int ClientId);
+	void RevertTeamPauseSpec(int Team);
 	void Tick();
 
 	// sets pError to an empty string on success (true)
