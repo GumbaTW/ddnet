@@ -155,6 +155,7 @@ void CGameClient::OnConsoleInit()
 					      &m_Emoticon,
 					      &m_InfoMessages,
 					      &m_Chat,
+					      &m_TwitchChat,
 					      &m_Broadcast,
 					      &m_ImportantAlert,
 					      &m_DebugHud,
@@ -171,6 +172,7 @@ void CGameClient::OnConsoleInit()
 	m_vpInput.insert(m_vpInput.end(), {&m_KeyBinder, // this will take over all input when we want to bind a key
 						  &m_Binds.m_SpecialBinds,
 						  &m_GameConsole,
+						  &m_TwitchChat,
 						  &m_Chat, // chat has higher prio, due to that you can quit it by pressing esc
 						  &m_Scoreboard,
 						  &m_Motd, // for pressing esc to remove it
