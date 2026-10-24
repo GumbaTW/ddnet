@@ -227,7 +227,7 @@ MACRO_CONFIG_STR(ClDummy7SkinEyes, dummy7_skin_eyes, protocol7::MAX_SKIN_ARRAY_S
 // MACRO_CONFIG_STR(ClCensorUrl, cl_censor_url, 100, "https://info.ddnet.org/censor.json", CFGFLAG_CLIENT | CFGFLAG_SAVE, "URL used to download words to censor (must start with https://)")
 
 MACRO_CONFIG_INT(UiPage, ui_page, 6, 6, 13, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Interface page")
-MACRO_CONFIG_INT(UiSettingsPage, ui_settings_page, 0, 0, 10, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Interface settings page")
+MACRO_CONFIG_INT(UiSettingsPage, ui_settings_page, 0, 0, 11, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Interface settings page")
 MACRO_CONFIG_INT(UiToolboxPage, ui_toolbox_page, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Toolbox page")
 MACRO_CONFIG_STR(UiServerAddress, ui_server_address, 1024, "localhost:8303", CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_INSENSITIVE, "Interface server address")
 MACRO_CONFIG_INT(UiMousesens, ui_mousesens, 200, 1, 100000, CFGFLAG_SAVE | CFGFLAG_CLIENT, "Mouse sensitivity for menus/editor")
@@ -804,3 +804,9 @@ MACRO_CONFIG_INT(ClVideoRecorderFPS, cl_video_recorder_fps, 60, 1, 1000, CFGFLAG
 /*
  * Add config variables for mods below this comment to avoid merge conflicts.
  */
+
+MACRO_CONFIG_STR(ClTwitchChannel, cl_twitch_channel, 26, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Twitch channel login (lowercase, without #)")
+MACRO_CONFIG_STR(ClTwitchLogin, cl_twitch_login, 26, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Twitch account login (lowercase)")
+MACRO_CONFIG_STR(ClTwitchAccessToken, cl_twitch_access_token, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_NONTEEHISTORIC, "Twitch user access token (stored locally in client settings)")
+MACRO_CONFIG_INT(ClTwitchShow, cl_twitch_show, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show the Twitch chat overlay")
+MACRO_CONFIG_INT(ClTwitchHeightOffset, cl_twitch_height_offset, 100, 0, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Height of Twitch chat above the normal game chat")

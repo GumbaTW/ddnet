@@ -580,6 +580,7 @@ protected:
 
 	// found in menus_settings_ddnet.cpp
 	void RenderSettingsDDNet(CUIRect MainView);
+	void RenderSettingsTwitch(CUIRect MainView);
 
 	// found in menus_settings_general.cpp
 	void RenderSettingsGeneral(CUIRect MainView);
@@ -716,6 +717,7 @@ public:
 		SETTINGS_DDNET,
 		SETTINGS_ASSETS,
 		SETTINGS_CREDITS,
+		SETTINGS_TWITCH,
 
 		SETTINGS_LENGTH,
 	};

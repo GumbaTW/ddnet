@@ -67,6 +67,7 @@
 #include "components/spectator.h"
 #include "components/statboard.h"
 #include "components/touch_controls.h"
+#include "components/twitch_chat.h"
 #include "components/voting.h"
 
 #include <memory>
@@ -153,6 +154,7 @@ public:
 	CInfoMessages m_InfoMessages;
 	CCamera m_Camera;
 	CChat m_Chat;
+	CTwitchChat m_TwitchChat;
 	CCensor m_Censor;
 	CMotd m_Motd;
 	CBroadcast m_Broadcast;

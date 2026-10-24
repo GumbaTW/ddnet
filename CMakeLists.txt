@@ -2415,6 +2415,8 @@ set_src(ENGINE_SHARED GLOB_RECURSE src/engine/shared
   teehistorian_ex_chunks.h
   translation_context.cpp
   translation_context.h
+  twitch_chat.cpp
+  twitch_chat.h
   uuid_manager.cpp
   uuid_manager.h
   video.cpp
@@ -2719,6 +2721,7 @@ if(CLIENT)
     components/menus_settings_sound.cpp
     components/menus_settings_tee.cpp
     components/menus_settings_tee7.cpp
+    components/menus_settings_twitch.cpp
     components/menus_start.cpp
     components/menus_start.h
     components/motd.cpp
@@ -2745,6 +2748,8 @@ if(CLIENT)
     components/statboard.h
     components/touch_controls.cpp
     components/touch_controls.h
+    components/twitch_chat.cpp
+    components/twitch_chat.h
     components/voting.cpp
     components/voting.h
     gameclient.cpp
@@ -3492,6 +3497,7 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     thread_test.cpp
     time_test.cpp
     timestamp_test.cpp
+    twitch_chat_test.cpp
     unix_test.cpp
     uuid_test.cpp
     vmath_test.cpp

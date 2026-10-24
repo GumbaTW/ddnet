@@ -176,7 +176,7 @@ bool CBinds::OnInput(const IInput::CEvent &Event)
 		const auto &&OnKeyRelease = [&](const CBindSlot &Bind) {
 			// Prevent binds from being deactivated while chat, console and menus are open, as these components will
 			// still allow key release events to be forwarded to this component, so the active binds can be cleared.
-			if(GameClient()->m_Chat.IsActive() ||
+			if(GameClient()->m_Chat.IsActive() || GameClient()->m_TwitchChat.IsActive() ||
 				GameClient()->m_GameConsole.IsActive() ||
 				GameClient()->m_Menus.IsActive())
 			{

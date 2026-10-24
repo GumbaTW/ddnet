@@ -230,7 +230,7 @@ void CControls::OnMessage(int Msg, void *pRawMsg)
 int CControls::SnapInput(int *pData)
 {
 	// update player state
-	if(GameClient()->m_Chat.IsActive())
+	if(GameClient()->m_Chat.IsActive() || GameClient()->m_TwitchChat.IsActive())
 		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags = PLAYERFLAG_CHATTING;
 	else if(GameClient()->m_Menus.IsActive())
 		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags = PLAYERFLAG_IN_MENU;
