@@ -69,6 +69,7 @@
 #include "components/touch_controls.h"
 #include "components/voting.h"
 
+#include <array>
 #include <memory>
 #include <vector>
 
@@ -698,7 +699,8 @@ public:
 	bool FastInputEnabled() const;
 	bool FastInputAggressive() const;
 	float FastInputOffsetTicks() const;
-	int FastInputExtraTicks(bool ForOthers = false) const;
+	int FastInputExtraTicks() const;
+	bool IsFastInputLocalClient(int ClientId) const;
 	void ApplyFastInputOffset(float OffsetTicks, int &Tick, float &Intra) const;
 	bool GetFastInputSampleTick(int ClientId, int &Tick, float &Intra) const;
 	void ApplyFastInputHook(int ClientId);
@@ -744,7 +746,6 @@ public:
 	CGameWorld m_PredictedWorld;
 	CGameWorld m_PrevPredictedWorld;
 	CGameWorld m_RegularPredictedWorld;
-	CGameWorld m_PrevRegularPredictedWorld;
 
 	std::vector<SSwitchers> &Switchers() { return m_GameWorld.m_Core.m_vSwitchers; }
 	std::vector<SSwitchers> &PredSwitchers() { return m_PredictedWorld.m_Core.m_vSwitchers; }
@@ -987,6 +988,7 @@ private:
 	vec2 GetSmoothPos(int ClientId);
 	vec2 GetFastInputPos(int ClientId);
 
+	std::array<int, 11> m_aFastInputSettings{};
 	int m_IsDummySwapping;
 	CCharOrder m_CharOrder;
 	int m_aSwitchStateTeam[NUM_DUMMIES];

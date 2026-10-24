@@ -2962,12 +2962,9 @@ void CClient::Update()
 					SendInput();
 				}
 
-				if(g_Config.m_GcFastInput && g_Config.m_GcFastInputMode == 1 && g_Config.m_GcFastInputTicks > 0)
-				{
-					GameClient()->CheckNewInput();
-					Repredict = true;
-				}
-				else if(g_Config.m_GcFastInput && GameClient()->CheckNewInput())
+				// Track inputs and settings even while disabled so re-enabling
+				// prediction cannot reuse a stale sample horizon.
+				if(GameClient()->CheckNewInput() && g_Config.m_GcFastInput)
 				{
 					Repredict = true;
 				}

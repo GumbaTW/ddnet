@@ -2759,6 +2759,7 @@ if(CLIENT)
     components/touch_controls.h
     components/voting.cpp
     components/voting.h
+    fast_input.h
     gameclient.cpp
     gameclient.h
     laser_data.cpp
@@ -3467,6 +3468,7 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     datafile_test.cpp
     dbg_test.cpp
     editor_test.cpp
+    fast_input_test.cpp
     fs_test.cpp
     gameworld_test.cpp
     git_revision_test.cpp

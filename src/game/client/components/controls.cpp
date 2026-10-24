@@ -16,6 +16,7 @@
 #include <game/client/components/chat.h>
 #include <game/client/components/menus.h>
 #include <game/client/components/scoreboard.h>
+#include <game/client/fast_input.h>
 #include <game/client/gameclient.h>
 #include <game/collision.h>
 #include <game/localization.h>
@@ -283,9 +284,6 @@ int CControls::SnapInput(int *pData)
 	}
 	else
 	{
-		m_FastInputHookAction = false;
-		m_FastInputFireAction = false;
-
 		m_aInputData[g_Config.m_ClDummy].m_TargetX = (int)m_aMousePos[g_Config.m_ClDummy].x;
 		m_aInputData[g_Config.m_ClDummy].m_TargetY = (int)m_aMousePos[g_Config.m_ClDummy].y;
 
@@ -534,52 +532,8 @@ bool CControls::CheckNewInput()
 				TestInput.m_Direction = 1;
 		}
 
-		if(m_aFastInput[Dummy].m_Direction != TestInput.m_Direction)
-			NewInput[Dummy] = true;
-		if(m_aFastInput[Dummy].m_Hook != TestInput.m_Hook)
-			NewInput[Dummy] = true;
-		if(m_aFastInput[Dummy].m_Fire != TestInput.m_Fire)
-			NewInput[Dummy] = true;
-		if(m_aFastInput[Dummy].m_Jump != TestInput.m_Jump)
-			NewInput[Dummy] = true;
-		if(m_aFastInput[Dummy].m_NextWeapon != TestInput.m_NextWeapon)
-			NewInput[Dummy] = true;
-		if(m_aFastInput[Dummy].m_PrevWeapon != TestInput.m_PrevWeapon)
-			NewInput[Dummy] = true;
-		if(m_aFastInput[Dummy].m_WantedWeapon != TestInput.m_WantedWeapon)
-			NewInput[Dummy] = true;
-
-		bool SetMousePos = false;
-		// Avoid mispredicted hooks and fires on the first tick they activate
-		// before we know the mouse position that was actually sent to the server.
-		if(Dummy == g_Config.m_ClDummy)
-		{
-			if(m_aFastInput[Dummy].m_Hook == 0 && TestInput.m_Hook == 1)
-			{
-				m_FastInputHookAction = true;
-				SetMousePos = true;
-			}
-			if(m_aFastInput[Dummy].m_Fire != TestInput.m_Fire && TestInput.m_Fire % 2 == 1)
-			{
-				m_FastInputFireAction = true;
-				SetMousePos = true;
-			}
-			if(!m_FastInputHookAction && !m_FastInputFireAction)
-			{
-				SetMousePos = true;
-			}
-		}
-
-		if(SetMousePos)
-		{
-			TestInput.m_TargetX = (int)m_aMousePos[Dummy].x;
-			TestInput.m_TargetY = (int)m_aMousePos[Dummy].y;
-		}
-		else
-		{
-			TestInput.m_TargetX = m_aFastInput[Dummy].m_TargetX;
-			TestInput.m_TargetY = m_aFastInput[Dummy].m_TargetY;
-		}
+		TestInput = FastInput::PrepareInput(TestInput, m_aFastInput[Dummy], m_aLastData[Dummy], m_aMousePos[Dummy], m_aMousePosOnAction[Dummy], Dummy == g_Config.m_ClDummy, g_Config.m_ClSubTickAiming != 0);
+		NewInput[Dummy] = FastInput::HasChanged(m_aFastInput[Dummy], TestInput, m_aLastData[Dummy]);
 
 		m_aFastInput[Dummy] = TestInput;
 	}

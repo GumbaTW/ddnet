@@ -37,8 +37,6 @@ public:
 	CNetObj_PlayerInput m_aInputData[NUM_DUMMIES];
 	CNetObj_PlayerInput m_aLastData[NUM_DUMMIES];
 	CNetObj_PlayerInput m_aFastInput[NUM_DUMMIES];
-	bool m_FastInputHookAction = false;
-	bool m_FastInputFireAction = false;
 	int m_aInputDirectionLeft[NUM_DUMMIES];
 	int m_aInputDirectionRight[NUM_DUMMIES];
 	int m_aShowHookColl[NUM_DUMMIES];
