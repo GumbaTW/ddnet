@@ -539,6 +539,12 @@ void CGameContext::ConTimeout(IConsole::IResult *pResult, void *pUserData)
 		return;
 
 	const char *pTimeout = pResult->NumArguments() > 0 ? pResult->GetString(0) : pPlayer->m_aTimeoutCode;
+	if(pSelf->Server()->IsTimeoutRecovery(pResult->m_ClientId) && pTimeout[0] == '\0')
+	{
+		log_info("chatresp", "A non-empty timeout code is required to recover a tee.");
+		return;
+	}
+
 
 	for(int i = 0; i < pSelf->Server()->MaxClients(); i++)
 	{
@@ -554,6 +560,12 @@ void CGameContext::ConTimeout(IConsole::IResult *pResult, void *pUserData)
 				pSelf->SendTuningParams(i, pSelf->m_apPlayers[i]->GetCharacter()->m_TuneZone);
 			return;
 		}
+	}
+
+	if(pSelf->Server()->IsTimeoutRecovery(pResult->m_ClientId))
+	{
+		log_info("chatresp", "This connection can only recover an existing tee. Use /timeout with its timeout code.");
+		return;
 	}
 
 	pSelf->Server()->SetTimeoutProtected(pResult->m_ClientId);

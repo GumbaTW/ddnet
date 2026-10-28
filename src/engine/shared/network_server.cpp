@@ -106,6 +106,7 @@ void CNetServer::Drop(int ClientId, const char *pReason)
 		m_pfnDelClient(ClientId, pReason, m_pUser);
 
 	m_aSlots[ClientId].m_Connection.Disconnect(pReason);
+	m_aSlots[ClientId].m_TimeoutRecoveryDeadline = 0;
 }
 
 void CNetServer::Update()
@@ -122,6 +123,11 @@ void CNetServer::Update()
 
 	for(int i = 0; i < MaxClients(); i++)
 	{
+		if(IsTimeoutRecovery(i) && Now >= m_aSlots[i].m_TimeoutRecoveryDeadline)
+		{
+			Drop(i, "Timeout recovery expired. Reconnect with your timeout code.");
+			continue;
+		}
 		m_aSlots[i].m_Connection.Update();
 		if(m_aSlots[i].m_Connection.State() == CNetConnection::EState::ERROR &&
 			(!m_aSlots[i].m_Connection.m_TimeoutProtected ||
@@ -177,14 +183,14 @@ void CNetServer::SendControl(NETADDR &Addr, int ControlMsg, const void *pExtra, 
 	CNetBase::SendControlMsg(m_Socket, &Addr, 0, ControlMsg, pExtra, ExtraSize, SecurityToken);
 }
 
-int CNetServer::NumClientsWithAddr(NETADDR Addr)
+int CNetServer::NumClientsWithAddr(NETADDR Addr, bool IncludeTimeoutProtected)
 {
 	int FoundAddr = 0;
 	for(int i = 0; i < MaxClients(); ++i)
 	{
 		if(m_aSlots[i].m_Connection.State() == CNetConnection::EState::OFFLINE ||
 			(m_aSlots[i].m_Connection.State() == CNetConnection::EState::ERROR &&
-				(!m_aSlots[i].m_Connection.m_TimeoutProtected ||
+				(!IncludeTimeoutProtected || !m_aSlots[i].m_Connection.m_TimeoutProtected ||
 					!m_aSlots[i].m_Connection.m_TimeoutSituation)))
 			continue;
 
@@ -240,6 +246,7 @@ int CNetServer::TryAcceptClient(NETADDR &Addr, SECURITY_TOKEN SecurityToken, int
 	}
 
 	const bool Reconnect = Slot != -1;
+	bool TimeoutRecovery = false;
 
 	if(Connlimit(Addr))
 	{
@@ -258,13 +265,23 @@ int CNetServer::TryAcceptClient(NETADDR &Addr, SECURITY_TOKEN SecurityToken, int
 	}
 	else
 	{
-		// check for sv_max_clients_per_ip
-		if(NumClientsWithAddr(Addr) + 1 > m_MaxClientsPerIp)
+		// Retained tees still count toward the limit. One additional connection
+		// may authenticate a recovery, but cannot play or become protected itself.
+		if(NumClientsWithAddr(Addr) >= m_MaxClientsPerIp)
 		{
-			char aBuf[128];
-			str_format(aBuf, sizeof(aBuf), "Only %d players with the same IP are allowed", m_MaxClientsPerIp);
-			CNetBase::SendControlMsg(m_Socket, &Addr, 0, NET_CTRLMSG_CLOSE, aBuf, str_length(aBuf) + 1, SecurityToken, Sixup);
-			return -1; // failed to add client
+			TimeoutRecovery = NumClientsWithAddr(Addr, false) < m_MaxClientsPerIp;
+			for(int i = 0; i < MaxClients(); i++)
+			{
+				if(IsTimeoutRecovery(i) && !net_addr_comp_noport(&Addr, ClientAddr(i)))
+					TimeoutRecovery = false;
+			}
+			if(!TimeoutRecovery)
+			{
+				char aBuf[128];
+				str_format(aBuf, sizeof(aBuf), "Only %d players with the same IP are allowed", m_MaxClientsPerIp);
+				CNetBase::SendControlMsg(m_Socket, &Addr, 0, NET_CTRLMSG_CLOSE, aBuf, str_length(aBuf) + 1, SecurityToken, Sixup);
+				return -1;
+			}
 		}
 
 		Slot = -1;
@@ -285,6 +302,10 @@ int CNetServer::TryAcceptClient(NETADDR &Addr, SECURITY_TOKEN SecurityToken, int
 			return -1; // failed to add client
 		}
 	}
+
+	// An existing recovery connection must not extend its deadline by rejoining.
+	if(!Reconnect)
+		m_aSlots[Slot].m_TimeoutRecoveryDeadline = TimeoutRecovery ? time_get() + time_freq() * g_Config.m_SvTimeoutRecovery : 0;
 
 	// init connection slot
 	m_aSlots[Slot].m_Connection.DirectInit(Addr, SecurityToken, Token, Sixup);
@@ -820,15 +841,34 @@ bool CNetServer::HasErrored(int ClientId)
 	return m_aSlots[ClientId].m_Connection.State() == CNetConnection::EState::ERROR;
 }
 
-void CNetServer::ResumeOldConnection(int ClientId, int OrigId)
+bool CNetServer::CanResumeOldConnection(int ClientId, int OrigId) const
 {
+	if(ClientId == OrigId || m_aSlots[ClientId].m_Connection.State() != CNetConnection::EState::ERROR ||
+		m_aSlots[OrigId].m_Connection.State() != CNetConnection::EState::ONLINE || IsTimeoutRecovery(ClientId))
+		return false;
+	if(IsTimeoutRecovery(OrigId) &&
+		(time_get() >= m_aSlots[OrigId].m_TimeoutRecoveryDeadline ||
+			!m_aSlots[ClientId].m_Connection.m_TimeoutProtected ||
+			!m_aSlots[ClientId].m_Connection.m_TimeoutSituation ||
+			net_addr_comp_noport(ClientAddr(ClientId), ClientAddr(OrigId))))
+		return false;
+	return true;
+}
+
+bool CNetServer::ResumeOldConnection(int ClientId, int OrigId)
+{
+	if(!CanResumeOldConnection(ClientId, OrigId))
+		return false;
 	m_aSlots[ClientId].m_Connection.ResumeConnection(ClientAddr(OrigId), m_aSlots[OrigId].m_Connection.SeqSequence(), m_aSlots[OrigId].m_Connection.AckSequence(), m_aSlots[OrigId].m_Connection.SecurityToken(), m_aSlots[OrigId].m_Connection.ResendBuffer(), m_aSlots[OrigId].m_Connection.m_Sixup);
 	m_aSlots[OrigId].m_Connection.Reset();
+	m_aSlots[OrigId].m_TimeoutRecoveryDeadline = 0;
+	return true;
 }
 
 void CNetServer::IgnoreTimeouts(int ClientId)
 {
-	m_aSlots[ClientId].m_Connection.m_TimeoutProtected = true;
+	if(!IsTimeoutRecovery(ClientId))
+		m_aSlots[ClientId].m_Connection.m_TimeoutProtected = true;
 }
 
 void CNetServer::ResetErrorString(int ClientId)

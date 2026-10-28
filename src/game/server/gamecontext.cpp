@@ -1845,7 +1845,7 @@ void CGameContext::OnClientConnected(int ClientId, void *pData)
 	}
 
 	// Check which team the player should be on
-	const int StartTeam = (Spec || g_Config.m_SvTournamentMode) ? TEAM_SPECTATORS : m_pController->GetAutoTeam(ClientId);
+	const int StartTeam = (Spec || g_Config.m_SvTournamentMode || Server()->IsTimeoutRecovery(ClientId)) ? TEAM_SPECTATORS : m_pController->GetAutoTeam(ClientId);
 	CreatePlayer(ClientId, StartTeam, Afk, LastWhisperTo);
 
 	SendMotd(ClientId);
@@ -2210,6 +2210,9 @@ void CGameContext::OnMessage(int MsgId, CUnpacker *pUnpacker, int ClientId)
 	if(!pRawMsg)
 		return;
 
+	if(Server()->IsTimeoutRecovery(ClientId) && MsgId != NETMSGTYPE_CL_STARTINFO && MsgId != NETMSGTYPE_CL_SAY)
+		return;
+
 	if(Server()->ClientIngame(ClientId))
 	{
 		switch(MsgId)
@@ -2271,6 +2274,20 @@ void CGameContext::OnMessage(int MsgId, CUnpacker *pUnpacker, int ClientId)
 
 void CGameContext::OnSayNetMessage(const CNetMsg_Cl_Say *pMsg, int ClientId, const CUnpacker *pUnpacker)
 {
+	if(Server()->IsTimeoutRecovery(ClientId))
+	{
+		CPlayer *pPlayer = m_apPlayers[ClientId];
+		if(pMsg->m_pMessage[0] != '/' ||
+			(pPlayer->m_LastChat && pPlayer->m_LastChat + Server()->TickSpeed() > Server()->Tick()))
+			return;
+		pPlayer->m_LastChat = Server()->Tick();
+		CClientChatLogger Logger(this, ClientId, log_get_scope_logger());
+		CLogScope Scope(&Logger);
+		// The server command permission callback allows only /timeout here,
+		// including within the client's automatic /mc;timeout ... command.
+		Console()->ExecuteLineFlag(pMsg->m_pMessage + 1, CFGFLAG_CHAT, ClientId, false);
+		return;
+	}
 	CPlayer *pPlayer = m_apPlayers[ClientId];
 	bool Check = !pPlayer->m_NotEligibleForFinish && pPlayer->m_EligibleForFinishCheck + 10 * time_freq() >= time_get();
 	if(Check && str_comp(pMsg->m_pMessage, "xd sure chillerbot.png is lyfe") == 0 && pMsg->m_Team == 0)

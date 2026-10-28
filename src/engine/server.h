@@ -371,6 +371,7 @@ public:
 	virtual void ResetNetErrorString(int ClientId) = 0;
 	virtual bool SetTimedOut(int ClientId, int OrigId) = 0;
 	virtual void SetTimeoutProtected(int ClientId) = 0;
+	virtual bool IsTimeoutRecovery(int ClientId) const = 0;
 
 	virtual void SetErrorShutdown(const char *pReason) = 0;
 	virtual void ExpireServerInfo() = 0;

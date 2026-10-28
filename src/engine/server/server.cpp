@@ -3895,6 +3895,11 @@ bool CServer::CanClientUseCommandCallback(int ClientId, const IConsole::ICommand
 
 bool CServer::CanClientUseCommand(int ClientId, const IConsole::ICommandInfo *pCommand) const
 {
+	// Stop chained commands after recovery has removed the temporary player.
+	if(m_aClients[ClientId].m_State == CClient::STATE_EMPTY)
+		return false;
+	if(IsTimeoutRecovery(ClientId))
+		return (pCommand->Flags() & CFGFLAG_CHAT) && str_comp(pCommand->Name(), "timeout") == 0;
 	// make sure we don't affect the wrong client, disallow id targeting commands when a moderator is using id translation
 	if(pCommand->TakesClientId() && !ClientSupportsServerMaxClients(ClientId))
 		return false;
@@ -4961,7 +4966,7 @@ int *CServer::GetReverseIdMap(int ClientId)
 
 bool CServer::SetTimedOut(int ClientId, int OrigId)
 {
-	if(!m_NetServer.HasErrored(ClientId))
+	if(!m_NetServer.CanResumeOldConnection(ClientId, OrigId))
 	{
 		return false;
 	}

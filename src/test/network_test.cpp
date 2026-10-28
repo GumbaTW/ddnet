@@ -1,6 +1,16 @@
+#include <base/net.h>
+#include <base/secure.h>
+
+#include <engine/shared/config.h>
 #include <engine/shared/network.h>
 
 #include <gtest/gtest.h>
+
+#include <chrono>
+#include <memory>
+#include <thread>
+#include <tuple>
+#include <vector>
 
 static int UnpackUncompressedPacket(int Size, CNetPacketConstruct *pPacket, bool AllowDecompression = true)
 {
@@ -113,3 +123,274 @@ TEST(Network, UnpackChunks)
 	CNetChunk Chunk;
 	EXPECT_FALSE(Unpacker.UnpackNextChunk(&Chunk));
 }
+
+// Exercise admission through real UDP packets, including the shared 0.6/0.7
+// limit and IPv4/IPv6 address comparisons.
+class CNetworkConnectionLimitTest : public ::testing::TestWithParam<std::tuple<bool, bool>>
+{
+protected:
+	struct CClient
+	{
+		NETADDR m_Addr;
+		NETSOCKET m_Socket;
+	};
+
+	std::unique_ptr<CNetServer> m_pServer = std::make_unique<CNetServer>();
+	std::vector<CClient> m_vClients;
+	int m_LastAccepted = -1;
+	int m_OldConnlimit;
+	int m_OldSixup;
+	int m_OldTimeoutRecovery;
+	int m_OldTimeout;
+	int m_OldProtection;
+
+	static int NewClient(int ClientId, void *pUser, bool Sixup)
+	{
+		static_cast<CNetworkConnectionLimitTest *>(pUser)->m_LastAccepted = ClientId;
+		return 0;
+	}
+
+	static int RejoinClient(int ClientId, void *pUser, bool Sixup, bool VanillaAuth)
+	{
+		static_cast<CNetworkConnectionLimitTest *>(pUser)->m_LastAccepted = ClientId;
+		return 0;
+	}
+
+	void SetUp() override
+	{
+		CNetBase::Init();
+		m_OldConnlimit = g_Config.m_SvConnlimit;
+		m_OldSixup = g_Config.m_SvSixup;
+		m_OldTimeoutRecovery = g_Config.m_SvTimeoutRecovery;
+		g_Config.m_SvTimeoutRecovery = 60;
+		m_OldTimeout = g_Config.m_ConnTimeout;
+		m_OldProtection = g_Config.m_ConnTimeoutProtection;
+		g_Config.m_ConnTimeout = 10;
+		g_Config.m_ConnTimeoutProtection = 1000;
+		g_Config.m_SvConnlimit = 100;
+		g_Config.m_SvSixup = 1;
+		NETADDR Addr;
+		ASSERT_EQ(net_addr_from_str(&Addr, std::get<0>(GetParam()) ? "[::1]" : "127.0.0.1"), 0);
+		bool Opened = false;
+		for(int i = 0; i < 32 && !Opened; i++)
+		{
+			Addr.port = 1024 + secure_rand_below(65535 - 1024);
+			Opened = m_pServer->Open(Addr, nullptr, 8, 1);
+		}
+		ASSERT_TRUE(Opened);
+		m_pServer->SetCallbacks(NewClient, nullptr, RejoinClient, nullptr, this);
+	}
+
+	void TearDown() override
+	{
+		for(const auto &Client : m_vClients)
+			net_udp_close(Client.m_Socket);
+		m_pServer->Close();
+		g_Config.m_SvConnlimit = m_OldConnlimit;
+		g_Config.m_SvSixup = m_OldSixup;
+		g_Config.m_SvTimeoutRecovery = m_OldTimeoutRecovery;
+		g_Config.m_ConnTimeout = m_OldTimeout;
+		g_Config.m_ConnTimeoutProtection = m_OldProtection;
+	}
+
+	void AddClient()
+	{
+		NETADDR Addr = m_pServer->Address();
+		NETSOCKET Socket = nullptr;
+		for(int i = 0; i < 32 && !Socket; i++)
+		{
+			Addr.port = 1024 + secure_rand_below(65535 - 1024);
+			Socket = net_udp_create(Addr);
+		}
+		ASSERT_NE(Socket, nullptr);
+		m_vClients.push_back({Addr, Socket});
+	}
+
+	int Connect(int Index)
+	{
+		const CClient &Client = m_vClients[Index];
+		NETADDR ServerAddr = m_pServer->Address();
+		const SECURITY_TOKEN Token = m_pServer->GetToken(Client.m_Addr);
+		if(std::get<1>(GetParam()))
+		{
+			CNetBase::SendControlMsgWithToken7(Client.m_Socket, &ServerAddr, Token, 0, NET_CTRLMSG_CONNECT, 123, false);
+		}
+		else
+		{
+			unsigned char aToken[sizeof(Token)];
+			WriteSecurityToken(aToken, Token);
+			CNetBase::SendControlMsg(Client.m_Socket, &ServerAddr, 0, NET_CTRLMSG_ACCEPT, aToken, sizeof(aToken), NET_SECURITY_TOKEN_UNSUPPORTED);
+		}
+		m_LastAccepted = -1;
+		EXPECT_EQ(net_socket_read_wait(m_pServer->Socket(), std::chrono::seconds(1)), 1);
+		CNetChunk Chunk;
+		SECURITY_TOKEN ResponseToken;
+		while(m_pServer->Recv(&Chunk, &ResponseToken))
+		{
+		}
+		return m_LastAccepted;
+	}
+
+	void TimeoutConnections()
+	{
+		// Force the regular timeout transition without sleeping. The network
+		// configuration parser never allows a negative timeout in production.
+		const int OldTimeout = g_Config.m_ConnTimeout;
+		const int OldProtection = g_Config.m_ConnTimeoutProtection;
+		g_Config.m_ConnTimeout = -1;
+		g_Config.m_ConnTimeoutProtection = 1000;
+		m_pServer->Update();
+		g_Config.m_ConnTimeout = OldTimeout;
+		g_Config.m_ConnTimeoutProtection = OldProtection;
+	}
+};
+
+TEST_P(CNetworkConnectionLimitTest, RejectsSecondActiveConnection)
+{
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	ASSERT_EQ(Connect(0), 0);
+	m_pServer->IgnoreTimeouts(0);
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	EXPECT_EQ(Connect(1), -1);
+	EXPECT_FALSE(m_pServer->HasErrored(0));
+	// Rejoining the existing active connection does not require another slot.
+	EXPECT_EQ(Connect(0), 0);
+}
+
+TEST_P(CNetworkConnectionLimitTest, AllowsTimeoutRecoveryAndKeepsLimit)
+{
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	ASSERT_EQ(Connect(0), 0);
+	m_pServer->IgnoreTimeouts(0);
+	TimeoutConnections();
+	ASSERT_TRUE(m_pServer->HasErrored(0));
+
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	ASSERT_EQ(Connect(1), 1);
+	// Admission must preserve the old tee for authentication by /timeout.
+	EXPECT_TRUE(m_pServer->HasErrored(0));
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	EXPECT_EQ(Connect(2), -1);
+
+	// This is the transport transfer performed after checking the timeout code.
+	ASSERT_TRUE(m_pServer->IsTimeoutRecovery(1));
+	ASSERT_TRUE(m_pServer->ResumeOldConnection(0, 1));
+	EXPECT_FALSE(m_pServer->IsTimeoutRecovery(0));
+	EXPECT_FALSE(m_pServer->IsTimeoutRecovery(1));
+	EXPECT_FALSE(m_pServer->HasErrored(0));
+	EXPECT_EQ(*m_pServer->ClientAddr(0), m_vClients[1].m_Addr);
+	EXPECT_EQ(Connect(2), -1);
+
+	// A late connection request from the old address cannot revive a second tee.
+	EXPECT_EQ(Connect(0), -1);
+}
+
+TEST_P(CNetworkConnectionLimitTest, MultipleProtectedTeesAllowOnlyOneActiveConnection)
+{
+	m_pServer->SetMaxClientsPerIp(4);
+	for(int i = 0; i < 4; i++)
+	{
+		ASSERT_NO_FATAL_FAILURE(AddClient());
+		ASSERT_EQ(Connect(i), i);
+		m_pServer->IgnoreTimeouts(i);
+	}
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	EXPECT_EQ(Connect(4), -1);
+	TimeoutConnections();
+	for(int i = 0; i < 4; i++)
+		ASSERT_TRUE(m_pServer->HasErrored(i));
+
+	m_pServer->SetMaxClientsPerIp(1);
+	EXPECT_EQ(Connect(4), 4);
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	EXPECT_EQ(Connect(5), -1);
+}
+
+TEST_P(CNetworkConnectionLimitTest, UnprotectedTimeoutReleasesSlot)
+{
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	ASSERT_EQ(Connect(0), 0);
+	TimeoutConnections();
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	EXPECT_EQ(Connect(1), 0);
+}
+
+TEST_P(CNetworkConnectionLimitTest, RecoveryTimeoutsCannotAccumulateProtectedTees)
+{
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	ASSERT_EQ(Connect(0), 0);
+	m_pServer->IgnoreTimeouts(0);
+	TimeoutConnections();
+	ASSERT_TRUE(m_pServer->HasErrored(0));
+
+	for(int i = 1; i <= 10; i++)
+	{
+		ASSERT_NO_FATAL_FAILURE(AddClient());
+		ASSERT_EQ(Connect(i), 1);
+		ASSERT_TRUE(m_pServer->IsTimeoutRecovery(1));
+		// Even direct attempts to protect the temporary connection are ignored.
+		m_pServer->IgnoreTimeouts(1);
+		TimeoutConnections();
+		EXPECT_TRUE(m_pServer->HasErrored(0));
+		EXPECT_FALSE(m_pServer->IsTimeoutRecovery(1));
+	}
+
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	ASSERT_EQ(Connect(11), 1);
+	EXPECT_TRUE(m_pServer->ResumeOldConnection(0, 1));
+}
+
+TEST_P(CNetworkConnectionLimitTest, OnlyOneRecoveryConnectionEvenWithHigherLimit)
+{
+	m_pServer->SetMaxClientsPerIp(4);
+	for(int i = 0; i < 4; i++)
+	{
+		ASSERT_NO_FATAL_FAILURE(AddClient());
+		ASSERT_EQ(Connect(i), i);
+		m_pServer->IgnoreTimeouts(i);
+	}
+	TimeoutConnections();
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	ASSERT_EQ(Connect(4), 4);
+	EXPECT_TRUE(m_pServer->IsTimeoutRecovery(4));
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	EXPECT_EQ(Connect(5), -1);
+	ASSERT_TRUE(m_pServer->ResumeOldConnection(0, 4));
+	EXPECT_EQ(Connect(5), 4);
+	EXPECT_TRUE(m_pServer->IsTimeoutRecovery(4));
+}
+
+TEST_P(CNetworkConnectionLimitTest, RecoveryCannotClaimAnotherRecoveryConnection)
+{
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	ASSERT_EQ(Connect(0), 0);
+	m_pServer->IgnoreTimeouts(0);
+	TimeoutConnections();
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	ASSERT_EQ(Connect(1), 1);
+	EXPECT_FALSE(m_pServer->ResumeOldConnection(1, 0));
+	EXPECT_TRUE(m_pServer->IsTimeoutRecovery(1));
+	EXPECT_TRUE(m_pServer->HasErrored(0));
+}
+
+TEST_P(CNetworkConnectionLimitTest, RejoiningCannotExtendRecoveryDeadline)
+{
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	ASSERT_EQ(Connect(0), 0);
+	m_pServer->IgnoreTimeouts(0);
+	TimeoutConnections();
+	g_Config.m_SvTimeoutRecovery = 1;
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	ASSERT_EQ(Connect(1), 1);
+	std::this_thread::sleep_for(std::chrono::milliseconds(600));
+	ASSERT_EQ(Connect(1), 1);
+	std::this_thread::sleep_for(std::chrono::milliseconds(600));
+	m_pServer->Update();
+	EXPECT_FALSE(m_pServer->IsTimeoutRecovery(1));
+	EXPECT_TRUE(m_pServer->HasErrored(0));
+	ASSERT_NO_FATAL_FAILURE(AddClient());
+	EXPECT_EQ(Connect(2), 1);
+}
+
+INSTANTIATE_TEST_SUITE_P(Network, CNetworkConnectionLimitTest,
+	::testing::Combine(::testing::Bool(), ::testing::Bool()));

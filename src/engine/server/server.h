@@ -543,6 +543,7 @@ public:
 	void ResetNetErrorString(int ClientId) override { m_NetServer.ResetErrorString(ClientId); }
 	bool SetTimedOut(int ClientId, int OrigId) override;
 	void SetTimeoutProtected(int ClientId) override { m_NetServer.IgnoreTimeouts(ClientId); }
+	bool IsTimeoutRecovery(int ClientId) const override { return m_NetServer.IsTimeoutRecovery(ClientId); }
 
 	void SendMsgRaw(int ClientId, const void *pData, int Size, int Flags) override;
 

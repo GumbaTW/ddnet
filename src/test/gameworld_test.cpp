@@ -1,6 +1,7 @@
 #include "test.h"
 
 #include <base/logger.h>
+#include <base/secure.h>
 #include <base/types.h>
 
 #include <engine/engine.h>
@@ -13,6 +14,7 @@
 #include <engine/server/server_logger.h>
 #include <engine/shared/assertion_logger.h>
 #include <engine/shared/config.h>
+#include <engine/shared/packer.h>
 
 #include <generated/protocol.h>
 
@@ -29,6 +31,7 @@
 #include <limits>
 #include <memory>
 #include <thread>
+#include <vector>
 
 bool IsInterrupted()
 {
@@ -142,6 +145,158 @@ public:
 		g_Config = m_ConfigBackup;
 	}
 };
+
+class TimeoutRecoveryGame : public GameWorld // NOLINT(readability-identifier-naming)
+{
+protected:
+	std::vector<NETSOCKET> m_vSockets;
+
+	void SetUp() override
+	{
+		CNetBase::Init();
+		g_Config.m_SvConnlimit = 100;
+		g_Config.m_ConnTimeout = 10;
+		g_Config.m_ConnTimeoutProtection = 1000;
+		g_Config.m_SvTimeoutRecovery = 60;
+		NETADDR Addr;
+		ASSERT_EQ(net_addr_from_str(&Addr, "127.0.0.1"), 0);
+		bool Opened = false;
+		for(int i = 0; i < 32 && !Opened; i++)
+		{
+			Addr.port = 1024 + secure_rand_below(65535 - 1024);
+			Opened = m_pServer->m_NetServer.Open(Addr, nullptr, m_pServer->MaxClients(), 1);
+		}
+		ASSERT_TRUE(Opened);
+		m_pServer->m_NetServer.SetCallbacks(CServer::NewClientCallback,
+			CServer::NewClientNoAuthCallback, CServer::ClientRejoinCallback,
+			CServer::DelClientCallback, m_pServer);
+	}
+
+	~TimeoutRecoveryGame() override
+	{
+		for(NETSOCKET Socket : m_vSockets)
+			net_udp_close(Socket);
+		m_pServer->m_NetServer.Close();
+	}
+
+	void ConnectPlayer(int ClientId)
+	{
+		NETADDR ServerAddr = m_pServer->m_NetServer.Address();
+		NETADDR ClientAddr = ServerAddr;
+		NETSOCKET Socket = nullptr;
+		for(int i = 0; i < 32 && !Socket; i++)
+		{
+			ClientAddr.port = 1024 + secure_rand_below(65535 - 1024);
+			Socket = net_udp_create(ClientAddr);
+		}
+		ASSERT_NE(Socket, nullptr);
+		m_vSockets.push_back(Socket);
+		unsigned char aToken[sizeof(SECURITY_TOKEN)];
+		WriteSecurityToken(aToken, m_pServer->m_NetServer.GetToken(ClientAddr));
+		CNetBase::SendControlMsg(Socket, &ServerAddr, 0, NET_CTRLMSG_ACCEPT,
+			aToken, sizeof(aToken), NET_SECURITY_TOKEN_UNSUPPORTED);
+		ASSERT_EQ(net_socket_read_wait(m_pServer->m_NetServer.Socket(), std::chrono::seconds(1)), 1);
+		CNetChunk Chunk;
+		SECURITY_TOKEN ResponseToken;
+		while(m_pServer->m_NetServer.Recv(&Chunk, &ResponseToken))
+		{
+		}
+		ASSERT_EQ(m_pServer->m_aClients[ClientId].m_State, CServer::CClient::STATE_PREAUTH);
+		m_pServer->m_aClients[ClientId].m_State = CServer::CClient::STATE_CONNECTING;
+		m_pServer->OnNetMsgReady(ClientId);
+		ASSERT_NE(GameServer()->m_apPlayers[ClientId], nullptr);
+		GameServer()->m_apPlayers[ClientId]->m_IsReady = true;
+		m_pServer->OnNetMsgEnterGame(ClientId);
+		ASSERT_TRUE(m_pServer->ClientIngame(ClientId));
+	}
+
+	void TimeoutConnections()
+	{
+		g_Config.m_ConnTimeout = -1;
+		m_pServer->m_NetServer.Update();
+		g_Config.m_ConnTimeout = 10;
+	}
+
+	void Say(int ClientId, const char *pMessage)
+	{
+		CPacker Packer;
+		Packer.Reset();
+		Packer.AddInt(0);
+		Packer.AddString(pMessage, 0);
+		CUnpacker Unpacker;
+		Unpacker.Reset(Packer.Data(), Packer.Size());
+		GameServer()->OnMessage(NETMSGTYPE_CL_SAY, &Unpacker, ClientId);
+	}
+};
+
+TEST_F(TimeoutRecoveryGame, RecoveryRequiresMatchingCodeAndCannotPlay)
+{
+	ASSERT_NO_FATAL_FAILURE(ConnectPlayer(0));
+	Say(0, "/timeout secret");
+	CPlayer *pOriginal = GameServer()->m_apPlayers[0];
+	ASSERT_STREQ(pOriginal->m_aTimeoutCode, "secret");
+	CCharacter *pCharacter = pOriginal->ForceSpawn(vec2(16, 16));
+	TimeoutConnections();
+	ASSERT_TRUE(m_pServer->m_NetServer.HasErrored(0));
+
+	ASSERT_NO_FATAL_FAILURE(ConnectPlayer(1));
+	ASSERT_TRUE(m_pServer->IsTimeoutRecovery(1));
+	CPlayer *pRecovery = GameServer()->m_apPlayers[1];
+	EXPECT_EQ(pRecovery->GetTeam(), TEAM_SPECTATORS);
+	EXPECT_EQ(pRecovery->GetCharacter(), nullptr);
+
+	CPacker Packer;
+	Packer.Reset();
+	Packer.AddInt(TEAM_GAME);
+	CUnpacker Unpacker;
+	Unpacker.Reset(Packer.Data(), Packer.Size());
+	GameServer()->OnMessage(NETMSGTYPE_CL_SETTEAM, &Unpacker, 1);
+	Say(1, "/mc;team 0;timeout wrong;timeout");
+	EXPECT_EQ(pRecovery->GetTeam(), TEAM_SPECTATORS);
+	EXPECT_EQ(pRecovery->GetCharacter(), nullptr);
+	EXPECT_STREQ(pRecovery->m_aTimeoutCode, "");
+	EXPECT_TRUE(m_pServer->m_NetServer.HasErrored(0));
+	EXPECT_STREQ(pOriginal->m_aTimeoutCode, "secret");
+
+	Say(1, "/mc;timeout secret;team 0");
+	EXPECT_EQ(GameServer()->m_apPlayers[0], pOriginal);
+	EXPECT_EQ(pOriginal->GetCharacter(), pCharacter);
+	EXPECT_EQ(GameServer()->m_apPlayers[1], nullptr);
+	EXPECT_FALSE(m_pServer->m_NetServer.HasErrored(0));
+	EXPECT_FALSE(m_pServer->IsTimeoutRecovery(0));
+}
+
+TEST_F(TimeoutRecoveryGame, WrongCodeCannotCreateAnotherProtectedTee)
+{
+	ASSERT_NO_FATAL_FAILURE(ConnectPlayer(0));
+	Say(0, "/timeout secret");
+	TimeoutConnections();
+	ASSERT_NO_FATAL_FAILURE(ConnectPlayer(1));
+	Say(1, "/timeout new-code");
+	EXPECT_STREQ(GameServer()->m_apPlayers[1]->m_aTimeoutCode, "");
+	TimeoutConnections();
+	EXPECT_EQ(GameServer()->m_apPlayers[1], nullptr);
+	EXPECT_NE(GameServer()->m_apPlayers[0], nullptr);
+	EXPECT_TRUE(m_pServer->m_NetServer.HasErrored(0));
+	ASSERT_NO_FATAL_FAILURE(ConnectPlayer(1));
+	Say(1, "/timeout secret");
+	EXPECT_EQ(GameServer()->m_apPlayers[1], nullptr);
+	EXPECT_FALSE(m_pServer->m_NetServer.HasErrored(0));
+}
+
+TEST_F(TimeoutRecoveryGame, EmptyCodeCannotAuthenticateRecovery)
+{
+	ASSERT_NO_FATAL_FAILURE(ConnectPlayer(0));
+	Say(0, "/timeout");
+	TimeoutConnections();
+	ASSERT_NO_FATAL_FAILURE(ConnectPlayer(1));
+	Say(1, "/timeout");
+	EXPECT_TRUE(m_pServer->IsTimeoutRecovery(1));
+	EXPECT_TRUE(m_pServer->m_NetServer.HasErrored(0));
+	EXPECT_NE(GameServer()->m_apPlayers[1], nullptr);
+	TimeoutConnections();
+	EXPECT_EQ(GameServer()->m_apPlayers[1], nullptr);
+}
 
 TEST_F(GameWorld, DebugDummiesConnectAndDrop)
 {

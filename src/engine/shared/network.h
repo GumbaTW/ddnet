@@ -429,6 +429,7 @@ class CNetServer
 	{
 	public:
 		CNetConnection m_Connection;
+		int64_t m_TimeoutRecoveryDeadline = 0;
 	};
 
 	struct CSpamConn
@@ -483,7 +484,7 @@ class CNetServer
 	void SendControl(NETADDR &Addr, int ControlMsg, const void *pExtra, int ExtraSize, SECURITY_TOKEN SecurityToken);
 
 	int TryAcceptClient(NETADDR &Addr, SECURITY_TOKEN SecurityToken, int Slot, bool VanillaAuth = false, bool Sixup = false, SECURITY_TOKEN Token = 0);
-	int NumClientsWithAddr(NETADDR Addr);
+	int NumClientsWithAddr(NETADDR Addr, bool IncludeTimeoutProtected = true);
 	bool Connlimit(NETADDR Addr);
 	void SendMsgs(NETADDR &Addr, const CPacker **ppMsgs, int Num);
 
@@ -525,7 +526,9 @@ public:
 	//
 	void SetMaxClientsPerIp(int Max);
 	bool HasErrored(int ClientId);
-	void ResumeOldConnection(int ClientId, int OrigId);
+	bool CanResumeOldConnection(int ClientId, int OrigId) const;
+	bool ResumeOldConnection(int ClientId, int OrigId);
+	bool IsTimeoutRecovery(int ClientId) const { return m_aSlots[ClientId].m_TimeoutRecoveryDeadline != 0; }
 	void IgnoreTimeouts(int ClientId);
 
 	void ResetErrorString(int ClientId);
